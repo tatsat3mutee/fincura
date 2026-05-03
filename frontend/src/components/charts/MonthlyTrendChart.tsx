@@ -7,14 +7,15 @@ import { api } from '../../api/client'
 import type { MonthlyTrendData } from '../../types'
 import { formatCurrency } from '../../types'
 
-interface Props { currency: string }
+interface Props { currency: string; refreshKey?: number }
 
-export default function MonthlyTrendChart({ currency }: Props) {
+export default function MonthlyTrendChart({ currency, refreshKey }: Props) {
   const [data, setData] = useState<MonthlyTrendData | null>(null)
 
   useEffect(() => {
+    setData(null)
     api.get<MonthlyTrendData>('/charts/monthly-trend?months=6').then(setData)
-  }, [])
+  }, [refreshKey])
 
   if (!data) return <div className="chart-placeholder">Loading…</div>
 

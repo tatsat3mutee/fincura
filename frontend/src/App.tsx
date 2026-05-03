@@ -13,6 +13,7 @@ import Household from './pages/Household'
 import Profile from './pages/Profile'
 import Calculators from './pages/Calculators'
 import Splits from './pages/Splits'
+import Income from './pages/Income'
 import './styles/layout.css'
 
 function AppLayout({ children }: { children: ReactNode }) {
@@ -63,6 +64,7 @@ export default function App() {
           <Route path="/oauth-callback" element={<OAuthCallback />} />
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
+          <Route path="/income" element={<PrivateRoute><Income /></PrivateRoute>} />
           <Route path="/budgets" element={<PrivateRoute><Budgets /></PrivateRoute>} />
           <Route path="/goals" element={<PrivateRoute><Goals /></PrivateRoute>} />
           <Route path="/household" element={<PrivateRoute><Household /></PrivateRoute>} />

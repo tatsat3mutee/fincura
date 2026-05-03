@@ -4,14 +4,15 @@ import { api } from '../../api/client'
 import type { CategoryBreakdown } from '../../types'
 import { formatCurrency } from '../../types'
 
-interface Props { month: string; currency: string }
+interface Props { month: string; currency: string; refreshKey?: number }
 
-export default function CategoryDonutChart({ month, currency }: Props) {
+export default function CategoryDonutChart({ month, currency, refreshKey }: Props) {
   const [data, setData] = useState<CategoryBreakdown | null>(null)
 
   useEffect(() => {
+    setData(null)
     api.get<CategoryBreakdown>(`/charts/category-breakdown?month=${month}`).then(setData)
-  }, [month])
+  }, [month, refreshKey])
 
   if (!data || data.labels.length === 0) {
     return <div className="chart-placeholder">No expense data.</div>

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { api } from '../api/client'
 import type { Category, Transaction } from '../types'
 import { todayISO } from '../types'
@@ -51,6 +51,9 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
   const selectedCat = filtered.find(c => c.id === categoryId)
   const isOther = selectedCat?.name === 'Other'
 
+  // Don't clear the pre-selected category on first render (categories may not have loaded yet)
+  const typeChangedRef = useRef(false)
+
   function updateSplitPct(idx: number, val: string) {
     setSplits(prev => prev.map((b, i) => i === idx ? { ...b, pct: Number(val) } : b))
   }
@@ -76,6 +79,7 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
   useEffect(() => { loadCategories() }, [])
 
   useEffect(() => {
+    if (!typeChangedRef.current) { typeChangedRef.current = true; return }
     if (categoryId && !filtered.find(c => c.id === categoryId)) {
       setCategoryId('')
     }

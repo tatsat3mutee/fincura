@@ -4,14 +4,15 @@ import { api } from '../../api/client'
 import type { DailySpend } from '../../types'
 import { formatCurrency } from '../../types'
 
-interface Props { month: string; currency: string }
+interface Props { month: string; currency: string; refreshKey?: number }
 
-export default function DailySpendChart({ month, currency }: Props) {
+export default function DailySpendChart({ month, currency, refreshKey }: Props) {
   const [data, setData] = useState<DailySpend | null>(null)
 
   useEffect(() => {
+    setData(null)
     api.get<DailySpend>(`/charts/daily-spend?month=${month}`).then(setData)
-  }, [month])
+  }, [month, refreshKey])
 
   if (!data) return <div className="chart-placeholder">Loading…</div>
 

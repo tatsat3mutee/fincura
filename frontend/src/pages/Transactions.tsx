@@ -14,13 +14,17 @@ export default function Transactions() {
   const [typeFilter, setTypeFilter] = useState('')
   const [editing, setEditing] = useState<Transaction | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [listLoading, setListLoading] = useState(false)
 
   const currency = user?.currency ?? 'INR'
 
   function load() {
+    setListLoading(true)
     const params = new URLSearchParams({ month, limit: '100' })
     if (typeFilter) params.set('type', typeFilter)
-    api.get<Transaction[]>(`/transactions?${params}`).then(setTransactions)
+    api.get<Transaction[]>(`/transactions?${params}`)
+      .then(setTransactions)
+      .finally(() => setListLoading(false))
   }
 
   useEffect(() => { load() }, [month, typeFilter])
@@ -71,7 +75,9 @@ export default function Transactions() {
         </div>
       </div>
 
-      {transactions.length === 0 ? (
+      {listLoading ? (
+        <p className="empty-state" style={{ textAlign: 'center', padding: '2rem' }}>Loading…</p>
+      ) : transactions.length === 0 ? (
         <p className="empty-state">No transactions found.</p>
       ) : (
         <div className="txn-list">

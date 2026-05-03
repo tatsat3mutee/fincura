@@ -32,10 +32,12 @@ export default function Dashboard() {
   const [summary, setSummary] = useState<MonthlySummary | null>(null)
   const [recent, setRecent] = useState<Transaction[]>([])
   const [showForm, setShowForm] = useState(false)
+  const [chartKey, setChartKey] = useState(0)
 
   function load() {
     api.get<MonthlySummary>(`/charts/summary?month=${month}`).then(setSummary)
     api.get<Transaction[]>(`/transactions?month=${month}&limit=5`).then(setRecent)
+    setChartKey(k => k + 1)
   }
 
   async function handleDelete(id: number) {
@@ -84,17 +86,17 @@ export default function Dashboard() {
       <div className="chart-row">
         <div className="chart-card chart-card--wide">
           <h3 className="chart-title">Monthly Trend</h3>
-          <MonthlyTrendChart currency={currency} />
+          <MonthlyTrendChart currency={currency} refreshKey={chartKey} />
         </div>
         <div className="chart-card">
           <h3 className="chart-title">By Category</h3>
-          <CategoryDonutChart month={month} currency={currency} />
+          <CategoryDonutChart month={month} currency={currency} refreshKey={chartKey} />
         </div>
       </div>
 
       <div className="chart-card chart-card--full">
         <h3 className="chart-title">Daily Spending — {monthLabel(month)}</h3>
-        <DailySpendChart month={month} currency={currency} />
+        <DailySpendChart month={month} currency={currency} refreshKey={chartKey} />
       </div>
 
       <div className="recent-section">
