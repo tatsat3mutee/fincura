@@ -46,6 +46,7 @@ export default function Goals() {
   const [depositGoal, setDepositGoal] = useState<Goal | null>(null)
   const [depositAmt, setDepositAmt] = useState('')
   const [depositErr, setDepositErr] = useState('')
+  const [toast, setToast] = useState('')
   const [name, setName] = useState('')
   const [target, setTarget] = useState('')
   const [saved, setSaved] = useState('0')
@@ -118,9 +119,12 @@ export default function Goals() {
     if (!depositGoal) return
     try {
       await api.post(`/goals/${depositGoal.id}/deposit`, { amount: parseFloat(depositAmt) })
+      const amt = parseFloat(depositAmt)
       setDepositGoal(null)
       setDepositAmt('')
       load()
+      setToast(`Deposited ₹${amt.toLocaleString()} — recorded as expense in Transactions`)
+      setTimeout(() => setToast(''), 4000)
     } catch (err) {
       setDepositErr(err instanceof Error ? err.message : 'Failed to deposit')
     }
@@ -246,11 +250,15 @@ export default function Goals() {
                 Amount
                 <input type="number" min="1" step="0.01" value={depositAmt} onChange={e => setDepositAmt(e.target.value)} className="form-input" required autoFocus placeholder="0" />
               </label>
+              <p className="form-hint">This will also add an expense transaction in the <strong>Savings</strong> category.</p>
               {depositErr && <p className="form-error">{depositErr}</p>}
               <button type="submit" className="btn-primary btn-full">Deposit</button>
             </form>
           </div>
         </div>
+      )}
+      {toast && (
+        <div className="goals-toast">{toast}</div>
       )}
     </div>
   )

@@ -17,34 +17,41 @@ async function request<T>(method: Method, path: string, body?: unknown, retries 
   if (t) headers['Authorization'] = `Bearer ${t}`
 
   for (let attempt = 0; attempt <= retries; attempt++) {
+    let res: Response
     try {
-      const res = await fetch(`${BASE}${path}`, {
+      res = await fetch(`${BASE}${path}`, {
         method,
         headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,
       })
-
-      if (res.status === 401) {
-        localStorage.removeItem('token')
-        window.location.href = '/login'
-        throw new Error('Unauthorized')
+    } catch (networkErr) {
+      // Pure network failure (no response) — retry with backoff
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)))
+        continue
       }
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: res.statusText }))
-        throw new Error(err.detail ?? 'Request failed')
-      }
-
-      if (res.status === 204 || res.status === 205) {
-        return undefined as T
-      }
-
-      return res.json() as Promise<T>
-    } catch (err) {
-      if (attempt === retries) throw err
-      // Exponential backoff: 1s, 2s, 4s
-      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)))
+      throw networkErr
     }
+
+    if (res.status === 401) {
+      localStorage.removeItem('token')
+      window.location.href = '/login'
+      throw new Error('Unauthorized')
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }))
+      const msg = err.detail ?? 'Request failed'
+      // 4xx = client error, no point retrying. 5xx = server error, retry.
+      if (res.status >= 500 && attempt < retries) {
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)))
+        continue
+      }
+      throw new Error(msg)
+    }
+
+    if (res.status === 204 || res.status === 205) return undefined as T
+    return res.json() as Promise<T>
   }
   throw new Error('Request failed after retries')
 }

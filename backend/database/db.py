@@ -222,6 +222,10 @@ _SCHEMA_MIGRATIONS = [
     "ALTER TABLE savings_goals ADD COLUMN scheme_type TEXT",
     "ALTER TABLE savings_goals ADD COLUMN institution TEXT",
     "ALTER TABLE savings_goals ADD COLUMN scheme_notes TEXT",
+    # Insert Savings category if it doesn't already exist (idempotent)
+    "INSERT INTO categories (user_id, name, icon, color, type, system_default, sort_order)"
+    " SELECT NULL, 'Savings', '💰', '#2e7d52', 'expense', 1, 11"
+    " WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Savings' AND system_default = 1)",
 ]
 
 _SEED_CATEGORIES = [
@@ -235,11 +239,12 @@ _SEED_CATEGORIES = [
     ("Travel",             "✈️",  "#7a9e7e", "expense", 8),
     ("Personal Care",      "🪥", "#b88db0", "expense", 9),
     ("Gifts & Donations",  "🎁", "#c0724a", "expense", 10),
-    ("Salary",             "💼", "#2e7d52", "income",  11),
-    ("Freelance",          "💻", "#357abd", "income",  12),
-    ("Business",           "📈", "#1a472a", "income",  13),
-    ("Investment Returns", "📊", "#4a8c6a", "income",  14),
-    ("Other",              "◎",  "#6b6b6b", "both",    15),
+    ("Savings",            "💰", "#2e7d52", "expense", 11),
+    ("Salary",             "💼", "#2e7d52", "income",  12),
+    ("Freelance",          "💻", "#357abd", "income",  13),
+    ("Business",           "📈", "#1a472a", "income",  14),
+    ("Investment Returns", "📊", "#4a8c6a", "income",  15),
+    ("Other",              "◎",  "#6b6b6b", "both",    16),
 ]
 
 
@@ -665,6 +670,19 @@ async def deposit_to_goal(user_id: int, goal_id: int, amount: float) -> bool:
             " WHERE id=? AND user_id=?",
             (new_saved, new_status, goal_id, user_id),
         )
+        # Find the Savings system category
+        cur = await db.execute(
+            "SELECT id FROM categories WHERE name = 'Savings' AND system_default = 1 LIMIT 1"
+        )
+        cat_row = await cur.fetchone()
+        if cat_row:
+            from datetime import date as _today
+            note = f"Savings: {goal['name']}"
+            await db.execute(
+                "INSERT INTO transactions (user_id, type, amount, category_id, note, txn_date)"
+                " VALUES (?, 'expense', ?, ?, ?, ?)",
+                (user_id, amount, cat_row["id"], note, _today.today().isoformat()),
+            )
         await db.commit()
     return True
 
