@@ -132,6 +132,37 @@
   font-family: var(--font-body);
 }
 
+.form-required {
+  color: var(--expense);
+  font-weight: 700;
+}
+
+/* Category chip grid */
+.cat-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.cat-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.65rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 20px;
+  background: var(--color-bg);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+.cat-chip:hover { border-color: var(--accent); }
+.cat-chip--on { font-weight: 700; }
+
 .form-error {
   font-size: 0.875rem;
   color: var(--color-error);

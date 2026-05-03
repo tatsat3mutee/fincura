@@ -1,3 +1,10 @@
+databases:
+  - name: fincura-db
+    databaseName: fincura
+    user: fincura_user
+    plan: free
+    region: singapore
+
 services:
   # ── Backend API ────────────────────────────────────────────────────────────
   - type: web
@@ -9,6 +16,10 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python -m uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fincura-db
+          property: connectionString
       - key: SECRET_KEY
         generateValue: true
       - key: ALLOWED_ORIGINS

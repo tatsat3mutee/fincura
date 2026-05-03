@@ -7,7 +7,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from database.db import init_db, seed_db
+from database.db import init_db, seed_db, startup_db, shutdown_db
 from routers import auth, budgets, categories, charts, goals, household, profile, transactions
 
 _ALLOWED_ORIGINS = [
@@ -29,9 +29,11 @@ async def lifespan(app: FastAPI):
             "Set the SECRET_KEY environment variable before deploying to production.",
             stacklevel=2,
         )
+    await startup_db()
     await init_db()
     await seed_db()
     yield
+    await shutdown_db()
 
 
 app = FastAPI(title="Fincura API", version="1.0.0", lifespan=lifespan)

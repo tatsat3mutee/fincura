@@ -1,12 +1,116 @@
-import aiosqlite
+import os
 import random
 import string
 from contextlib import asynccontextmanager
+from datetime import date as _date
+from dateutil.relativedelta import relativedelta
 from pathlib import Path
 
+DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+IS_POSTGRES: bool = DATABASE_URL.startswith("postgres")
 DB_PATH = Path(__file__).parent.parent / "fincura.db"
 
-_SCHEMA = """
+# ── PostgreSQL support (asyncpg wrapped to look like aiosqlite) ────────────────
+if IS_POSTGRES:
+    import asyncpg as _asyncpg
+
+    _pool: "_asyncpg.Pool | None" = None
+
+    class _PgCursor:
+        """Mimics the aiosqlite cursor interface over asyncpg results."""
+        def __init__(self) -> None:
+            self._rows: list = []
+            self.rowcount: int = 0
+            self.lastrowid: int = 0
+
+        async def fetchone(self):
+            return dict(self._rows[0]) if self._rows else None
+
+        async def fetchall(self):
+            return [dict(r) for r in self._rows]
+
+    class _PgConn:
+        """Adapts an asyncpg connection to the aiosqlite cursor-based API."""
+        def __init__(self, conn) -> None:
+            self._conn = conn
+
+        @staticmethod
+        def _adapt(sql: str, params=()):
+            """Convert ? → $N and CURRENT_TIMESTAMP → now()::text."""
+            i, result = 0, []
+            for c in sql:
+                if c == "?":
+                    i += 1
+                    result.append(f"${i}")
+                else:
+                    result.append(c)
+            pg_sql = "".join(result).replace("CURRENT_TIMESTAMP", "now()::text")
+            return pg_sql, list(params)
+
+        async def execute(self, sql: str, params=()) -> "_PgCursor":
+            pg_sql, pg_params = self._adapt(sql, params)
+            cursor = _PgCursor()
+            s = sql.strip().upper()
+            if s.startswith("SELECT"):
+                cursor._rows = await self._conn.fetch(pg_sql, *pg_params)
+            elif s.startswith("INSERT"):
+                if "RETURNING" not in pg_sql.upper():
+                    pg_sql += " RETURNING id"
+                cursor.lastrowid = await self._conn.fetchval(pg_sql, *pg_params) or 0
+            elif s.startswith("UPDATE") or s.startswith("DELETE"):
+                status = await self._conn.execute(pg_sql, *pg_params)
+                try:
+                    cursor.rowcount = int(status.split()[-1])
+                except Exception:
+                    cursor.rowcount = 0
+            else:
+                await self._conn.execute(pg_sql, *pg_params)
+            return cursor
+
+        async def executemany(self, sql: str, params_list) -> None:
+            pg_sql, _ = self._adapt(sql, [])
+            await self._conn.executemany(pg_sql, [list(p) for p in params_list])
+
+        async def commit(self) -> None:
+            pass  # handled by the transaction() context manager
+
+    @asynccontextmanager
+    async def get_db():
+        assert _pool is not None, "DB pool not initialised – call startup_db() first"
+        async with _pool.acquire() as conn:
+            async with conn.transaction():
+                yield _PgConn(conn)
+
+    async def startup_db() -> None:
+        global _pool
+        url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        _pool = await _asyncpg.create_pool(url, min_size=1, max_size=5)
+
+    async def shutdown_db() -> None:
+        if _pool:
+            await _pool.close()
+
+# ── SQLite support (local / CI) ────────────────────────────────────────────────
+else:
+    import aiosqlite
+
+    @asynccontextmanager
+    async def get_db():
+        async with aiosqlite.connect(DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
+            await db.execute("PRAGMA foreign_keys = ON")
+            yield db
+
+    async def startup_db() -> None:
+        pass
+
+    async def shutdown_db() -> None:
+        pass
+
+
+# ── Schema ─────────────────────────────────────────────────────────────────────
+
+_SCHEMA_SQLITE = """
 CREATE TABLE IF NOT EXISTS users (
     id            INTEGER PRIMARY KEY,
     name          TEXT    NOT NULL,
@@ -89,6 +193,13 @@ CREATE TABLE IF NOT EXISTS savings_goals (
 );
 """
 
+# PostgreSQL: SERIAL PKs + now()::text defaults
+_SCHEMA_POSTGRES = (
+    _SCHEMA_SQLITE
+    .replace("INTEGER PRIMARY KEY", "SERIAL PRIMARY KEY")
+    .replace("DEFAULT CURRENT_TIMESTAMP", "DEFAULT now()::text")
+)
+
 _SCHEMA_MIGRATIONS = [
     "ALTER TABLE users ADD COLUMN google_id TEXT UNIQUE",
     "ALTER TABLE budgets ADD COLUMN period_months INTEGER NOT NULL DEFAULT 1",
@@ -116,31 +227,43 @@ _SEED_CATEGORIES = [
 ]
 
 
-@asynccontextmanager
-async def get_db():
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        await db.execute("PRAGMA foreign_keys = ON")
-        yield db
-
-
 async def init_db() -> None:
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("PRAGMA foreign_keys = ON")
-        await db.executescript(_SCHEMA)
-        await db.commit()
-        for migration in _SCHEMA_MIGRATIONS:
-            try:
-                await db.execute(migration)
-                await db.commit()
-            except Exception:
-                pass
+    if IS_POSTGRES:
+        assert _pool is not None
+        async with _pool.acquire() as conn:
+            stmts = [s.strip() for s in _SCHEMA_POSTGRES.split(";") if s.strip()]
+            for stmt in stmts:
+                try:
+                    await conn.execute(stmt)
+                except Exception:
+                    pass  # table / index already exists
+            for migration in _SCHEMA_MIGRATIONS:
+                pg_mig = migration.replace("CURRENT_TIMESTAMP", "now()::text")
+                try:
+                    await conn.execute(pg_mig)
+                except Exception:
+                    pass  # column already exists
+    else:
+        import aiosqlite as _aio
+        async with _aio.connect(DB_PATH) as db:
+            await db.execute("PRAGMA foreign_keys = ON")
+            await db.executescript(_SCHEMA_SQLITE)
+            await db.commit()
+            for migration in _SCHEMA_MIGRATIONS:
+                try:
+                    await db.execute(migration)
+                    await db.commit()
+                except Exception:
+                    pass
 
 
 async def seed_db() -> None:
     async with get_db() as db:
-        row = await db.execute("SELECT COUNT(*) FROM categories WHERE system_default = 1")
-        count = (await row.fetchone())[0]
+        cur = await db.execute(
+            "SELECT COUNT(*) as cnt FROM categories WHERE system_default = 1"
+        )
+        row = await cur.fetchone()
+        count = row["cnt"] if row else 0
         if count:
             return
         await db.executemany(
@@ -257,7 +380,7 @@ async def get_transactions(
         sql += " AND t.category_id = ?"
         params.append(category_id)
     if month:
-        sql += " AND strftime('%Y-%m', t.txn_date) = ?"
+        sql += " AND substr(t.txn_date, 1, 7) = ?"
         params.append(month)
     if q:
         sql += " AND t.note LIKE ?"
@@ -318,7 +441,7 @@ async def get_monthly_summary(user_id: int, month: str) -> dict:
     async with get_db() as db:
         cur = await db.execute(
             "SELECT type, SUM(amount) as total FROM transactions"
-            " WHERE user_id = ? AND strftime('%Y-%m', txn_date) = ? GROUP BY type",
+            " WHERE user_id = ? AND substr(txn_date, 1, 7) = ? GROUP BY type",
             (user_id, month),
         )
         rows = await cur.fetchall()
@@ -330,13 +453,14 @@ async def get_monthly_summary(user_id: int, month: str) -> dict:
 
 
 async def get_monthly_trend(user_id: int, months: int = 6):
+    cutoff = (_date.today() - relativedelta(months=months)).isoformat()
     async with get_db() as db:
         cur = await db.execute(
-            "SELECT strftime('%Y-%m', txn_date) as month, type, SUM(amount) as total"
+            "SELECT substr(txn_date, 1, 7) as month, type, SUM(amount) as total"
             " FROM transactions"
-            " WHERE user_id = ? AND txn_date >= date('now', '-' || ? || ' months')"
-            " GROUP BY strftime('%Y-%m', txn_date), type ORDER BY month",
-            (user_id, months),
+            " WHERE user_id = ? AND txn_date >= ?"
+            " GROUP BY substr(txn_date, 1, 7), type ORDER BY month",
+            (user_id, cutoff),
         )
         return await cur.fetchall()
 
@@ -346,7 +470,7 @@ async def get_category_breakdown(user_id: int, month: str):
         cur = await db.execute(
             "SELECT c.name, c.color, c.icon, SUM(t.amount) as total"
             " FROM transactions t JOIN categories c ON t.category_id = c.id"
-            " WHERE t.user_id = ? AND t.type = 'expense' AND strftime('%Y-%m', t.txn_date) = ?"
+            " WHERE t.user_id = ? AND t.type = 'expense' AND substr(t.txn_date, 1, 7) = ?"
             " GROUP BY c.id ORDER BY total DESC",
             (user_id, month),
         )
@@ -356,10 +480,10 @@ async def get_category_breakdown(user_id: int, month: str):
 async def get_daily_spend(user_id: int, month: str):
     async with get_db() as db:
         cur = await db.execute(
-            "SELECT strftime('%d', txn_date) as day, SUM(amount) as total"
+            "SELECT substr(txn_date, 9, 2) as day, SUM(amount) as total"
             " FROM transactions"
-            " WHERE user_id = ? AND type = 'expense' AND strftime('%Y-%m', txn_date) = ?"
-            " GROUP BY strftime('%d', txn_date) ORDER BY day",
+            " WHERE user_id = ? AND type = 'expense' AND substr(txn_date, 1, 7) = ?"
+            " GROUP BY substr(txn_date, 9, 2) ORDER BY day",
             (user_id, month),
         )
         return await cur.fetchall()
@@ -368,24 +492,46 @@ async def get_daily_spend(user_id: int, month: str):
 # ── Budget queries ────────────────────────────────────────────────────────────
 
 async def get_budgets(user_id: int, month: str):
+async def get_budgets(user_id: int, month: str):
+    # 1. Fetch budget rows (no SQLite-specific date arithmetic)
     async with get_db() as db:
         cur = await db.execute(
             "SELECT b.id, b.category_id, b.month, b.amount as limit_amount,"
             " COALESCE(b.period_months, 1) as period_months,"
-            " c.name as category_name, c.icon as category_icon, c.color as category_color,"
-            " COALESCE(("
-            "  SELECT SUM(t.amount) FROM transactions t"
-            "  WHERE t.user_id = ? AND t.category_id = b.category_id"
-            "  AND t.type = 'expense'"
-            "  AND t.txn_date >= date(b.month || '-01')"
-            "  AND t.txn_date < date(b.month || '-01', '+' || COALESCE(b.period_months,1) || ' months')"
-            " ), 0) as spent"
+            " c.name as category_name, c.icon as category_icon, c.color as category_color"
             " FROM budgets b JOIN categories c ON b.category_id = c.id"
             " WHERE b.user_id = ? AND b.month = ?"
             " ORDER BY c.sort_order",
-            (user_id, user_id, month),
+            (user_id, month),
         )
-        return await cur.fetchall()
+        budget_rows = await cur.fetchall()
+
+    # 2. Compute spent per budget using Python date arithmetic
+    results = []
+    for b in budget_rows:
+        period = int(b["period_months"] or 1)
+        start = f"{b['month']}-01"
+        end = (_date.fromisoformat(start) + relativedelta(months=period)).isoformat()
+        async with get_db() as db:
+            cur = await db.execute(
+                "SELECT COALESCE(SUM(amount), 0) as spent FROM transactions"
+                " WHERE user_id = ? AND category_id = ? AND type = 'expense'"
+                " AND txn_date >= ? AND txn_date < ?",
+                (user_id, b["category_id"], start, end),
+            )
+            spent_row = await cur.fetchone()
+        results.append({
+            "id": b["id"],
+            "category_id": b["category_id"],
+            "month": b["month"],
+            "limit_amount": float(b["limit_amount"]),
+            "period_months": period,
+            "category_name": b["category_name"],
+            "category_icon": b["category_icon"],
+            "category_color": b["category_color"],
+            "spent": float(spent_row["spent"]) if spent_row else 0.0,
+        })
+    return results
 
 
 async def create_budget(user_id: int, category_id: int, month: str, amount: float, period_months: int = 1) -> int:

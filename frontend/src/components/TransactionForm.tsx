@@ -41,6 +41,10 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
   const totalPct = splits.reduce((s, b) => s + (Number(b.pct) || 0), 0)
   const amountNum = parseFloat(amount) || 0
 
+  const filtered = categories.filter(c => c.type === type || c.type === 'both')
+  const selectedCat = filtered.find(c => c.id === categoryId)
+  const isOther = selectedCat?.name === 'Other'
+
   function updateSplitPct(idx: number, val: string) {
     setSplits(prev => prev.map((b, i) => i === idx ? { ...b, pct: Number(val) } : b))
   }
@@ -65,8 +69,6 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
 
   useEffect(() => { loadCategories() }, [])
 
-  const filtered = categories.filter(c => c.type === type || c.type === 'both')
-
   useEffect(() => {
     if (categoryId && !filtered.find(c => c.id === categoryId)) {
       setCategoryId('')
@@ -77,6 +79,7 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
     e.preventDefault()
     setError('')
     if (!categoryId) { setError('Please select a category'); return }
+    if (isOther && !note.trim()) { setError('Please describe what "Other" is'); return }
     if (showSplit && totalPct !== 100) { setError('Income split must total 100%'); return }
     const body = { type, amount: parseFloat(amount), category_id: categoryId, note: note || null, txn_date: txnDate }
     setLoading(true)
@@ -195,38 +198,60 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
             </div>
           )}
 
-          <label className="form-label">
+          {/* Category chips */}
+          <div className="form-label">
             Category
             {catsError ? (
               <div className="form-cats-error">
                 {catsError} — <button type="button" onClick={loadCategories} className="form-retry">retry</button>
               </div>
+            ) : catsLoading ? (
+              <p className="form-hint" style={{ marginTop: '0.4rem' }}>Loading…</p>
             ) : (
-              <select
-                value={categoryId}
-                onChange={e => setCategoryId(Number(e.target.value))}
+              <div className="cat-chip-grid">
+                {filtered.map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={'cat-chip' + (categoryId === c.id ? ' cat-chip--on' : '')}
+                    style={categoryId === c.id
+                      ? { borderColor: c.color, background: c.color + '18', color: c.color }
+                      : undefined}
+                    onClick={() => setCategoryId(c.id)}
+                  >
+                    <span>{c.icon}</span>
+                    <span>{c.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* "Other" description — required when Other is selected */}
+          {isOther ? (
+            <label className="form-label">
+              What is this? <span className="form-required">*</span>
+              <input
+                type="text"
+                value={note}
+                onChange={e => setNote(e.target.value)}
                 className="form-input"
                 required
-                disabled={catsLoading}
-              >
-                <option value="">{catsLoading ? 'Loading…' : 'Select category…'}</option>
-                {filtered.map(c => (
-                  <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
-                ))}
-              </select>
-            )}
-          </label>
-
-          <label className="form-label">
-            Note <span className="form-hint">(optional)</span>
-            <input
-              type="text"
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              className="form-input"
-              placeholder="e.g. Lunch with team"
-            />
-          </label>
+                placeholder="e.g. Cash withdrawal, miscellaneous purchase"
+              />
+            </label>
+          ) : (
+            <label className="form-label">
+              Note <span className="form-hint">(optional)</span>
+              <input
+                type="text"
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                className="form-input"
+                placeholder="e.g. Lunch with team"
+              />
+            </label>
+          )}
 
           <label className="form-label">
             Date
@@ -249,3 +274,4 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
     </div>
   )
 }
+
