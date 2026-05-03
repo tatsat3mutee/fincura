@@ -492,7 +492,6 @@ async def get_daily_spend(user_id: int, month: str):
 # ── Budget queries ────────────────────────────────────────────────────────────
 
 async def get_budgets(user_id: int, month: str):
-async def get_budgets(user_id: int, month: str):
     # 1. Fetch budget rows (no SQLite-specific date arithmetic)
     async with get_db() as db:
         cur = await db.execute(
