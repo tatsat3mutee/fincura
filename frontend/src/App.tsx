@@ -1,6 +1,7 @@
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { pingBackend } from './api/client'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
@@ -53,9 +54,37 @@ function PrivateRoute({ children }: { children: ReactNode }) {
   return user ? <AppLayout>{children}</AppLayout> : <Navigate to="/login" replace />
 }
 
+function WakeUpBanner() {
+  const [show, setShow] = useState(false)
+  const [done, setDone] = useState(false)
+  const pinged = useRef(false)
+
+  useEffect(() => {
+    if (pinged.current || !import.meta.env.VITE_API_URL) return
+    pinged.current = true
+    // Only show banner if backend takes > 1.5s to respond
+    const timer = setTimeout(() => setShow(true), 1500)
+    pingBackend().then(() => {
+      clearTimeout(timer)
+      if (show) { setDone(true); setTimeout(() => setShow(false), 2000) }
+      else { clearTimeout(timer); setShow(false) }
+    })
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (!show) return null
+  return (
+    <div className="wakeup-banner">
+      <span className="wakeup-dot" />
+      {done ? '✓ Server ready' : 'Server waking up — first load may take ~30s…'}
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <WakeUpBanner />
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
