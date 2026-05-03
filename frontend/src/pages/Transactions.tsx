@@ -62,7 +62,7 @@ export default function Transactions() {
   }
 
   function loadBudgets() {
-    api.get<Budget[]>(`/budgets?month=${month}`).then(data => {
+    return api.get<Budget[]>(`/budgets?month=${month}`).then(data => {
       setBudgets(data)
       data.forEach(b => {
         const pct = b.limit_amount > 0 ? (b.spent / b.limit_amount) * 100 : 0
@@ -118,16 +118,30 @@ export default function Transactions() {
   async function handleBudgetSubmit(e: FormEvent) {
     e.preventDefault(); setBudgetError('')
     if (!editingBudget && selectedCatIds.length === 0) { setBudgetError('Select at least one category'); return }
+    const amt = parseFloat(budgetAmount)
+    if (!amt || amt <= 0) { setBudgetError('Enter a valid amount'); return }
     setSaving(true)
     try {
       if (editingBudget) {
-        await api.put(`/budgets/${editingBudget.id}`, { amount: parseFloat(budgetAmount) })
+        await api.put(`/budgets/${editingBudget.id}`, { amount: amt })
+        setShowBudgetForm(false); loadBudgets()
       } else {
-        await Promise.all(selectedCatIds.map(catId =>
-          api.post('/budgets', { category_id: catId, month, amount: parseFloat(budgetAmount), period_months: periodMonths })
-        ))
+        // Use allSettled so a duplicate conflict on one category doesn't block others
+        const results = await Promise.allSettled(
+          selectedCatIds.map(catId =>
+            api.post('/budgets', { category_id: catId, month, amount: amt, period_months: periodMonths })
+          )
+        )
+        const failed = results.filter(r => r.status === 'rejected')
+        setShowBudgetForm(false)
+        await loadBudgets()
+        if (failed.length > 0) {
+          const reason = failed[0].status === 'rejected'
+            ? (failed[0].reason instanceof Error ? failed[0].reason.message : String(failed[0].reason))
+            : ''
+          addToast(`⚠️ ${failed.length} budget(s) not saved: ${reason}`, 'warn')
+        }
       }
-      setShowBudgetForm(false); loadBudgets()
     } catch (err) {
       setBudgetError(err instanceof Error ? err.message : 'Failed to save')
     } finally { setSaving(false) }
@@ -294,6 +308,7 @@ export default function Transactions() {
               <button className="modal-close" onClick={() => setShowBudgetForm(false)}>✕</button>
             </div>
             <form onSubmit={handleBudgetSubmit} className="txn-form">
+              {budgetError && <p className="form-error" style={{ marginTop: 0 }}>{budgetError}</p>}
               {!editingBudget && (
                 <div className="form-label">
                   Categories
@@ -340,7 +355,6 @@ export default function Transactions() {
                 />
               </label>
 
-              {budgetError && <p className="form-error">{budgetError}</p>}
               <button
                 type="submit"
                 disabled={saving || (!editingBudget && selectedCatIds.length === 0)}

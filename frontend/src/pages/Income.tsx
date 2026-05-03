@@ -60,45 +60,82 @@ interface TransferState { fromIdx: number; toIdx: number; amount: string }
 export default function Income() {
   const { user } = useAuth()
   const currency = user?.currency ?? 'INR'
+  const uid = user?.id ?? 'guest'
   const [month, setMonth] = useState(currentMonth())
   const [summary, setSummary] = useState<MonthlySummary | null>(null)
   const [expenseTxns, setExpenseTxns] = useState<Transaction[]>([])
   const [incomeTxns, setIncomeTxns] = useState<Transaction[]>([])
-  const [preset, setPreset] = useState<string>('Custom')
-  const [buckets, setBuckets] = useState<Bucket[]>(PRESETS['Custom'].map(b => ({ ...b })))
+  const [preset, setPreset] = useState<string>(() => localStorage.getItem(`fincura_preset_${uid}`) ?? 'Custom')
+  const [buckets, setBuckets] = useState<Bucket[]>(() => {
+    try {
+      const raw = localStorage.getItem(`fincura_buckets_${uid}`)
+      if (raw) return JSON.parse(raw) as Bucket[]
+    } catch { /* ignore */ }
+    return PRESETS['Custom'].map(b => ({ ...b }))
+  })
   const [transfer, setTransfer] = useState<TransferState | null>(null)
   const [editIncome, setEditIncome] = useState(false)
-  const [manualIncome, setManualIncome] = useState<string>('')
+  const [manualIncome, setManualIncome] = useState<string>(() =>
+    localStorage.getItem(`fincura_income_${uid}_${currentMonth()}`) ?? ''
+  )
 
   function load() {
     api.get<MonthlySummary>(`/charts/summary?month=${month}`).then(s => {
       setSummary(s)
-      if (!manualIncome) setManualIncome(String(s.income || ''))
+      // Only fall back to actual income if no manual value is stored for this month
+      const stored = localStorage.getItem(`fincura_income_${uid}_${month}`)
+      if (!stored) setManualIncome(String(s.income || ''))
     })
     api.get<Transaction[]>(`/transactions?month=${month}&type=expense&limit=200`).then(setExpenseTxns)
     api.get<Transaction[]>(`/transactions?month=${month}&type=income&limit=100`).then(setIncomeTxns)
   }
 
-  useEffect(() => { load() }, [month])
+  useEffect(() => {
+    // Restore persisted income for this month before loading
+    const stored = localStorage.getItem(`fincura_income_${uid}_${month}`)
+    if (stored) setManualIncome(stored)
+    load()
+  }, [month])
 
   function applyPreset(key: string) {
     setPreset(key)
-    setBuckets(PRESETS[key].map(b => ({ ...b })))
+    const next = PRESETS[key].map(b => ({ ...b }))
+    setBuckets(next)
+    localStorage.setItem(`fincura_buckets_${uid}`, JSON.stringify(next))
+    localStorage.setItem(`fincura_preset_${uid}`, key)
   }
 
   function updatePct(idx: number, val: string) {
-    setBuckets(prev => prev.map((b, i) => i === idx ? { ...b, pct: Math.max(0, Math.min(100, Number(val) || 0)) } : b))
+    setBuckets(prev => {
+      const next = prev.map((b, i) => i === idx ? { ...b, pct: Math.max(0, Math.min(100, Number(val) || 0)) } : b)
+      localStorage.setItem(`fincura_buckets_${uid}`, JSON.stringify(next))
+      return next
+    })
     setPreset('Custom')
+    localStorage.setItem(`fincura_preset_${uid}`, 'Custom')
   }
   function updateLabel(idx: number, val: string) {
-    setBuckets(prev => prev.map((b, i) => i === idx ? { ...b, label: val } : b))
+    setBuckets(prev => {
+      const next = prev.map((b, i) => i === idx ? { ...b, label: val } : b)
+      localStorage.setItem(`fincura_buckets_${uid}`, JSON.stringify(next))
+      return next
+    })
   }
   function addBucket() {
-    setBuckets(prev => [...prev, { label: 'New bucket', pct: 0, color: '#6b6b6b', icon: '◎' }])
+    setBuckets(prev => {
+      const next = [...prev, { label: 'New bucket', pct: 0, color: '#6b6b6b', icon: '◎' }]
+      localStorage.setItem(`fincura_buckets_${uid}`, JSON.stringify(next))
+      return next
+    })
     setPreset('Custom')
+    localStorage.setItem(`fincura_preset_${uid}`, 'Custom')
   }
   function removeBucket(idx: number) {
-    setBuckets(prev => prev.filter((_, i) => i !== idx))
+    setBuckets(prev => {
+      const next = prev.filter((_, i) => i !== idx)
+      localStorage.setItem(`fincura_buckets_${uid}`, JSON.stringify(next))
+      return next
+    })
   }
 
   function doTransfer() {
@@ -115,6 +152,7 @@ export default function Income() {
       // Round to 1 decimal
       next[transfer.fromIdx].pct = Math.round(next[transfer.fromIdx].pct * 10) / 10
       next[transfer.toIdx].pct = Math.round(next[transfer.toIdx].pct * 10) / 10
+      localStorage.setItem(`fincura_buckets_${uid}`, JSON.stringify(next))
       return next
     })
     setTransfer(null)
@@ -142,9 +180,9 @@ export default function Income() {
           <p className="income-subtitle">Set your income once · allocate buckets · track actual spend</p>
         </div>
         <div className="income-month-nav">
-          <button className="month-btn" onClick={() => { setManualIncome(''); setMonth(prevMonth(month)) }}>‹</button>
+          <button className="month-btn" onClick={() => setMonth(prevMonth(month))}>‹</button>
           <span className="income-month-label">{monthLabel(month)}</span>
-          <button className="month-btn" onClick={() => { setManualIncome(''); setMonth(nextMonth(month)) }} disabled={month >= currentMonth()}>›</button>
+          <button className="month-btn" onClick={() => setMonth(nextMonth(month))} disabled={month >= currentMonth()}>›</button>
         </div>
       </div>
 
@@ -162,7 +200,10 @@ export default function Income() {
               autoFocus
               placeholder="0"
             />
-            <button className="income-set-save" onClick={() => setEditIncome(false)}>Done</button>
+          <button className="income-set-save" onClick={() => {
+              localStorage.setItem(`fincura_income_${uid}_${month}`, manualIncome)
+              setEditIncome(false)
+            }}>Done</button>
           </div>
         ) : (
           <div className="income-set-display">

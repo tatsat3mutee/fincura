@@ -28,16 +28,21 @@ function nextMonth(m: string): string {
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const uid = user?.id ?? 'guest'
   const [month, setMonth] = useState(currentMonth())
   const [summary, setSummary] = useState<MonthlySummary | null>(null)
   const [recent, setRecent] = useState<Transaction[]>([])
   const [showForm, setShowForm] = useState(false)
   const [chartKey, setChartKey] = useState(0)
+  const [plannedIncome, setPlannedIncome] = useState<number | null>(null)
 
   function load() {
     api.get<MonthlySummary>(`/charts/summary?month=${month}`).then(setSummary)
     api.get<Transaction[]>(`/transactions?month=${month}&limit=5`).then(setRecent)
     setChartKey(k => k + 1)
+    // Read planned income set in Income page
+    const stored = localStorage.getItem(`fincura_income_${uid}_${month}`)
+    setPlannedIncome(stored ? parseFloat(stored) || null : null)
   }
 
   async function handleDelete(id: number) {
@@ -49,6 +54,12 @@ export default function Dashboard() {
   useEffect(() => { load() }, [month])
 
   const currency = user?.currency ?? 'INR'
+  const expense = summary?.expense ?? 0
+  const income = summary?.income ?? 0
+  // Use planned budget if set, otherwise fall back to actual income
+  const budget = plannedIncome ?? income
+  const budgetUsed = budget > 0 ? Math.min((expense / budget) * 100, 100) : 0
+  const budgetRemaining = budget - expense
 
   return (
     <div className="dashboard">
@@ -67,21 +78,42 @@ export default function Dashboard() {
 
       <div className="stat-cards">
         <StatCard
-          label="Income"
-          value={formatCurrency(summary?.income ?? 0, currency)}
+          label={plannedIncome ? 'Monthly Budget' : 'Income'}
+          value={formatCurrency(budget, currency)}
           color="income"
+          sub={plannedIncome ? `₹${income.toLocaleString('en-IN')} received` : undefined}
         />
         <StatCard
-          label="Expenses"
-          value={formatCurrency(summary?.expense ?? 0, currency)}
+          label="Spent"
+          value={formatCurrency(expense, currency)}
           color="expense"
+          sub={budget > 0 ? `${Math.round(budgetUsed)}% of budget` : undefined}
         />
         <StatCard
-          label="Net"
-          value={formatCurrency(summary?.net ?? 0, currency)}
-          color={summary && summary.net >= 0 ? 'income' : 'expense'}
+          label={budgetRemaining >= 0 ? 'Remaining' : 'Over budget'}
+          value={formatCurrency(Math.abs(budgetRemaining), currency)}
+          color={budgetRemaining >= 0 ? 'income' : 'expense'}
+          sub={plannedIncome ? undefined : `Net: ${formatCurrency(summary?.net ?? 0, currency)}`}
         />
       </div>
+
+      {/* Budget progress bar — shown when planned income is set */}
+      {plannedIncome !== null && budget > 0 && (
+        <div className="dash-budget-bar-wrap">
+          <div className="dash-budget-bar-bg">
+            <div
+              className="dash-budget-bar-fill"
+              style={{
+                width: `${budgetUsed}%`,
+                background: budgetUsed >= 100 ? 'var(--expense)' : budgetUsed >= 75 ? '#d97706' : 'var(--income)'
+              }}
+            />
+          </div>
+          <span className="dash-budget-bar-label">
+            {Math.round(budgetUsed)}% of {formatCurrency(budget, currency)} budget used
+          </span>
+        </div>
+      )}
 
       <div className="chart-row">
         <div className="chart-card chart-card--wide">
