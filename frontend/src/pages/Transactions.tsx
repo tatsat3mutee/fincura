@@ -227,7 +227,18 @@ export default function Transactions() {
           </div>
 
           {listLoading ? (
-            <p className="empty-state" style={{ textAlign: 'center', padding: '2rem' }}>Loading…</p>
+            <div className="txn-skeleton-list">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="txn-skeleton-row">
+                  <div className="txn-skeleton-icon" />
+                  <div className="txn-skeleton-body">
+                    <div className="txn-skeleton-line txn-skeleton-line--title" />
+                    <div className="txn-skeleton-line txn-skeleton-line--sub" />
+                  </div>
+                  <div className="txn-skeleton-amount" />
+                </div>
+              ))}
+            </div>
           ) : transactions.length === 0 ? (
             <p className="empty-state">No transactions found.</p>
           ) : (
