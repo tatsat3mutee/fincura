@@ -12,6 +12,7 @@ import Goals from './pages/Goals'
 import Household from './pages/Household'
 import Profile from './pages/Profile'
 import Calculators from './pages/Calculators'
+import Splits from './pages/Splits'
 import './styles/layout.css'
 
 function AppLayout({ children }: { children: ReactNode }) {
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="/household" element={<PrivateRoute><Household /></PrivateRoute>} />
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           <Route path="/calculators" element={<PrivateRoute><Calculators /></PrivateRoute>} />
+          <Route path="/splits" element={<PrivateRoute><Splits /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>

@@ -312,3 +312,80 @@
 }
 .split-add:hover { background: rgba(46,125,82,0.07); }
 
+/* ── Bill split (expense) ── */
+.bill-split-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+@media (max-width: 480px) {
+  .bill-split-row { grid-template-columns: 1fr; }
+}
+
+.bill-split-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.bill-split-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.bill-people-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+}
+.bill-people-btn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bill-people-btn:hover { background: var(--expense-light); }
+.bill-people-count {
+  font-size: 1rem;
+  font-weight: 700;
+  min-width: 1.5rem;
+  text-align: center;
+  color: var(--color-text);
+}
+.bill-people-unit {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.bill-share-result {
+  margin-top: 0.25rem;
+  padding: 0.6rem 0.85rem;
+  background: var(--expense-light);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--expense);
+}
+.bill-share-result strong {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+.bill-share-sub {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  margin-left: 0.35rem;
+}
+

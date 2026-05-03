@@ -38,6 +38,12 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
   const [showSplit, setShowSplit] = useState(false)
   const [splits, setSplits] = useState<SplitBucket[]>(DEFAULT_SPLITS.map(s => ({ ...s })))
 
+  // Bill split state (expense only)
+  const [showBillSplit, setShowBillSplit] = useState(false)
+  const [billTotal, setBillTotal] = useState('')
+  const [billPeople, setBillPeople] = useState(2)
+  const billShare = billTotal ? Math.round((parseFloat(billTotal) / billPeople) * 100) / 100 : 0
+
   const totalPct = splits.reduce((s, b) => s + (Number(b.pct) || 0), 0)
   const amountNum = parseFloat(amount) || 0
 
@@ -81,7 +87,12 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
     if (!categoryId) { setError('Please select a category'); return }
     if (isOther && !note.trim()) { setError('Please describe what "Other" is'); return }
     if (showSplit && totalPct !== 100) { setError('Income split must total 100%'); return }
-    const body = { type, amount: parseFloat(amount), category_id: categoryId, note: note || null, txn_date: txnDate }
+    const finalAmount = showBillSplit && billShare > 0 ? billShare : parseFloat(amount)
+    if (!finalAmount || finalAmount <= 0) { setError('Enter a valid amount'); return }
+    const splitNote = showBillSplit && billShare > 0
+      ? `Split ${billPeople} ways (₹${parseFloat(billTotal).toLocaleString('en-IN')} total)${note ? ' · ' + note : ''}`
+      : note || null
+    const body = { type, amount: finalAmount, category_id: categoryId, note: splitNote, txn_date: txnDate }
     setLoading(true)
     try {
       if (editing && transaction) {
@@ -125,14 +136,66 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
               type="number"
               min="0.01"
               step="0.01"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
+              value={showBillSplit && billShare > 0 ? billShare : amount}
+              onChange={e => { if (!showBillSplit) setAmount(e.target.value) }}
+              readOnly={showBillSplit && !!billTotal}
               className="form-input"
-              required
+              required={!showBillSplit}
               autoFocus
               placeholder="0"
             />
           </label>
+
+          {/* Bill split — expense only, not editing */}
+          {type === 'expense' && !editing && (
+            <div className="split-section">
+              <button
+                type="button"
+                className={'split-toggle' + (showBillSplit ? ' split-toggle--on' : '')}
+                onClick={() => { setShowBillSplit(v => !v); setBillTotal(''); setBillPeople(2) }}
+              >
+                <span className="split-toggle-icon">{showBillSplit ? '▾' : '▸'}</span>
+                Split this bill
+                {showBillSplit && billShare > 0 && (
+                  <span className="split-toggle-hint"> — your share ₹{billShare.toLocaleString('en-IN')}</span>
+                )}
+              </button>
+
+              {showBillSplit && (
+                <div className="split-panel">
+                  <div className="bill-split-row">
+                    <label className="bill-split-field">
+                      <span className="bill-split-label">Total bill</span>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={billTotal}
+                        onChange={e => setBillTotal(e.target.value)}
+                        className="form-input"
+                        placeholder="e.g. 727"
+                      />
+                    </label>
+                    <label className="bill-split-field">
+                      <span className="bill-split-label">Split between</span>
+                      <div className="bill-people-wrap">
+                        <button type="button" className="bill-people-btn" onClick={() => setBillPeople(p => Math.max(2, p - 1))}>−</button>
+                        <span className="bill-people-count">{billPeople}</span>
+                        <button type="button" className="bill-people-btn" onClick={() => setBillPeople(p => Math.min(20, p + 1))}>+</button>
+                        <span className="bill-people-unit">people</span>
+                      </div>
+                    </label>
+                  </div>
+                  {billShare > 0 && (
+                    <div className="bill-share-result">
+                      Your share: <strong>₹{billShare.toLocaleString('en-IN')}</strong>
+                      <span className="bill-share-sub"> of ₹{parseFloat(billTotal).toLocaleString('en-IN')} total</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Income distribution — only shown for income, not when editing */}
           {type === 'income' && !editing && (

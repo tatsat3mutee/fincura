@@ -9,6 +9,7 @@ from slowapi.errors import RateLimitExceeded
 
 from database.db import init_db, seed_db, startup_db, shutdown_db
 from routers import auth, budgets, categories, charts, goals, household, profile, transactions
+from routers import splits
 
 _ALLOWED_ORIGINS = [
     o.strip()
@@ -56,6 +57,7 @@ app.include_router(budgets.router,      prefix="/api/budgets",       tags=["budg
 app.include_router(goals.router,        prefix="/api/goals",         tags=["goals"])
 app.include_router(household.router,    prefix="/api/household",     tags=["household"])
 app.include_router(profile.router,      prefix="/api/profile",       tags=["profile"])
+app.include_router(splits.router)
 
 
 @app.get("/health")

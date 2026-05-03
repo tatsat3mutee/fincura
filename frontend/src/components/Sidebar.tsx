@@ -7,6 +7,7 @@ const NAV = [
   { to: '/transactions', label: 'Transactions',  icon: '⇄' },
   { to: '/budgets',      label: 'Budgets',       icon: '◫' },
   { to: '/goals',        label: 'Goals',         icon: '◎' },
+  { to: '/splits',       label: 'Splits',        icon: '⊕' },
   { to: '/calculators',  label: 'Calculators',   icon: '◧' },
   { to: '/household',    label: 'Household',     icon: '⌂' },
   { to: '/profile',      label: 'Profile',       icon: '◉' },

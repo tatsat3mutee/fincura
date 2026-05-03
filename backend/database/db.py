@@ -191,6 +191,22 @@ CREATE TABLE IF NOT EXISTS savings_goals (
     created_at    TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at    TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS splits (
+    id           INTEGER PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title        TEXT    NOT NULL,
+    total_amount REAL    NOT NULL,
+    created_at   TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS split_members (
+    id           INTEGER PRIMARY KEY,
+    split_id     INTEGER NOT NULL REFERENCES splits(id) ON DELETE CASCADE,
+    name         TEXT    NOT NULL,
+    share_amount REAL    NOT NULL,
+    paid         INTEGER NOT NULL DEFAULT 0
+);
 """
 
 # PostgreSQL: SERIAL PKs + now()::text defaults
@@ -774,3 +790,69 @@ async def get_user_stats(user_id: int) -> dict:
         )
         row = await cur.fetchone()
         return dict(row) if row else {"total_txns": 0, "total_spent": 0.0, "total_earned": 0.0}
+
+
+# ── Splits (bill splitting) ────────────────────────────────────────────────
+
+async def get_splits(user_id: int) -> list:
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT * FROM splits WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,),
+        )
+        rows = await cur.fetchall()
+        result = []
+        for row in rows:
+            split = dict(row)
+            mcur = await db.execute(
+                "SELECT * FROM split_members WHERE split_id = ? ORDER BY id",
+                (row["id"],),
+            )
+            members = [dict(m) for m in await mcur.fetchall()]
+            split["members"] = members
+            result.append(split)
+        return result
+
+
+async def create_split(user_id: int, title: str, total_amount: float, members: list) -> int:
+    async with get_db() as db:
+        cur = await db.execute(
+            "INSERT INTO splits (user_id, title, total_amount) VALUES (?, ?, ?)",
+            (user_id, title, total_amount),
+        )
+        await db.commit()
+        split_id = cur.lastrowid
+        for m in members:
+            await db.execute(
+                "INSERT INTO split_members (split_id, name, share_amount) VALUES (?, ?, ?)",
+                (split_id, m["name"], m["share_amount"]),
+            )
+        await db.commit()
+        return split_id
+
+
+async def delete_split(user_id: int, split_id: int) -> bool:
+    async with get_db() as db:
+        cur = await db.execute(
+            "DELETE FROM splits WHERE id = ? AND user_id = ?", (split_id, user_id)
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def toggle_split_member_paid(user_id: int, split_id: int, member_id: int) -> bool:
+    async with get_db() as db:
+        # Verify ownership
+        cur = await db.execute(
+            "SELECT id FROM splits WHERE id = ? AND user_id = ?", (split_id, user_id)
+        )
+        if not await cur.fetchone():
+            return False
+        await db.execute(
+            "UPDATE split_members SET paid = CASE WHEN paid = 1 THEN 0 ELSE 1 END"
+            " WHERE id = ? AND split_id = ?",
+            (member_id, split_id),
+        )
+        await db.commit()
+        return True
+

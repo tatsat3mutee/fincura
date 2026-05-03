@@ -268,3 +268,34 @@ class UserStatsOut(BaseModel):
     total_txns: int
     total_spent: float
     total_earned: float
+
+
+# ── Splits ────────────────────────────────────────────────────────────────────
+
+class SplitMemberCreate(BaseModel):
+    name: str
+    share_amount: float
+
+
+class SplitCreate(BaseModel):
+    title: str
+    total_amount: float
+    members: list[SplitMemberCreate]
+
+
+class SplitMemberOut(BaseModel):
+    id: int
+    name: str
+    share_amount: float
+    paid: bool
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SplitOut(BaseModel):
+    id: int
+    title: str
+    total_amount: float
+    created_at: str
+    members: list[SplitMemberOut]
+    model_config = ConfigDict(from_attributes=True)
+

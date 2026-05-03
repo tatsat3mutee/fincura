@@ -119,6 +119,22 @@ export function todayISO(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+export interface SplitMember {
+  id: number
+  name: string
+  share_amount: number
+  paid: boolean
+}
+
+export interface Split {
+  id: number
+  title: string
+  total_amount: number
+  created_at: string
+  members: SplitMember[]
+}
+
+
 export function currentMonth(): string {
   return new Date().toISOString().slice(0, 7)
 }
