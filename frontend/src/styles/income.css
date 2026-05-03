@@ -44,13 +44,9 @@
 /* Stat cards */
 .income-summary-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 1rem;
   margin-bottom: 1.75rem;
-}
-
-@media (max-width: 560px) {
-  .income-summary-row { grid-template-columns: 1fr; }
 }
 
 .income-stat-card {
@@ -77,10 +73,218 @@
   font-weight: 400;
 }
 
-.income-stat-card--income .income-stat-value { color: var(--income); }
-.income-stat-card--expense .income-stat-value { color: var(--expense); }
-.income-stat-card--net .income-stat-value { color: var(--income); }
-.income-stat-card--deficit .income-stat-value { color: var(--expense); }
+.income-stat-card--daily .income-stat-value { color: var(--income); }
+.income-stat-sub {
+  font-size: 0.72rem;
+  color: var(--color-muted);
+  margin-top: -0.1rem;
+}
+
+/* ── Income setter ── */
+.income-set-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0.85rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+.income-set-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+  flex-shrink: 0;
+}
+.income-set-display {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+}
+.income-set-value {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  color: var(--income);
+}
+.income-set-edit-btn {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.2rem 0.55rem;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.income-set-edit-btn:hover { border-color: var(--accent); color: var(--accent); }
+.income-set-edit {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+.income-set-symbol {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--income);
+}
+.income-set-input {
+  flex: 1;
+  border: 1.5px solid var(--accent);
+  border-radius: 8px;
+  padding: 0.45rem 0.7rem;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--income);
+  background: var(--color-bg);
+  outline: none;
+  max-width: 180px;
+}
+.income-set-save {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Buckets */
+.income-buckets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* New card-style bucket */
+.income-bucket-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.75rem 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.income-bucket-top {
+  display: grid;
+  grid-template-columns: 24px 1fr 70px 90px 22px;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.income-bucket-icon {
+  font-size: 1rem;
+  text-align: center;
+}
+
+.income-bucket-label-input {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.income-bucket-label-input:focus { outline: none; border-color: var(--accent); }
+
+.income-bucket-pct-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.income-bucket-pct-input {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.3rem 1.2rem 0.3rem 0.5rem;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.income-bucket-pct-input:focus { outline: none; border-color: var(--accent); }
+.income-bucket-pct-sign {
+  position: absolute;
+  right: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  pointer-events: none;
+}
+
+.income-bucket-alloc {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.income-bucket-remove {
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  font-size: 0.7rem;
+  cursor: pointer;
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.income-bucket-remove:hover { background: #fecaca; color: var(--color-error); }
+
+/* Spend bar inside bucket card */
+.income-bucket-spend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-left: 30px;
+}
+.income-bucket-bar-bg {
+  height: 6px;
+  background: var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.income-bucket-bar-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.4s;
+}
+.income-bucket-spend-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Transfer button */
+.income-transfer-btn {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.2rem 0.55rem;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  cursor: pointer;
+  margin-left: 30px;
+  transition: all 0.12s;
+}
+.income-transfer-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+
 
 /* Body layout */
 .income-body {
@@ -161,86 +365,7 @@
   transition: width 0.3s;
 }
 
-/* Buckets */
-.income-buckets {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.income-bucket-row {
-  display: grid;
-  grid-template-columns: 24px 1fr 70px 100px 24px;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.income-bucket-icon {
-  font-size: 1rem;
-  text-align: center;
-}
-
-.income-bucket-label-input {
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 0.35rem 0.5rem;
-  font-family: var(--font-body);
-  font-size: 0.85rem;
-  background: var(--color-bg);
-  color: var(--color-text);
-}
-.income-bucket-label-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.income-bucket-pct-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.income-bucket-pct-input {
-  width: 100%;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 0.35rem 1.2rem 0.35rem 0.5rem;
-  font-family: var(--font-body);
-  font-size: 0.85rem;
-  background: var(--color-bg);
-  color: var(--color-text);
-}
-.income-bucket-pct-input:focus { outline: none; border-color: var(--accent); }
-.income-bucket-pct-sign {
-  position: absolute;
-  right: 0.4rem;
-  font-size: 0.75rem;
-  color: var(--color-muted);
-  pointer-events: none;
-}
-
-.income-bucket-amount {
-  font-family: var(--font-display);
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.income-bucket-remove {
-  background: none;
-  border: none;
-  color: var(--color-muted);
-  font-size: 0.7rem;
-  cursor: pointer;
-  border-radius: 4px;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.income-bucket-remove:hover { background: #fecaca; color: var(--color-error); }
-
+/* ── Footer ── */
 .income-planner-footer {
   display: flex;
   align-items: center;

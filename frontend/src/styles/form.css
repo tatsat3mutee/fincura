@@ -172,8 +172,130 @@
   padding: 0.5rem 0.75rem;
 }
 
-/* ── Income split ── */
-.split-section {
+/* ── Amount row with split calc button ── */
+.amount-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+  margin-top: 0.35rem;
+}
+.amount-input { flex: 1; margin-top: 0 !important; }
+
+.split-calc-btn {
+  width: 40px;
+  height: 40px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.split-calc-btn:hover { border-color: var(--expense); color: var(--expense); }
+.split-calc-btn--on { border-color: var(--expense); background: var(--expense-light); color: var(--expense); }
+
+/* ── Inline split calculator panel ── */
+.split-calc-panel {
+  background: var(--expense-light);
+  border: 1px solid #f5c6c2;
+  border-radius: 10px;
+  padding: 0.875rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.split-calc-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  align-items: end;
+}
+@media (max-width: 400px) { .split-calc-row { grid-template-columns: 1fr; } }
+
+.split-calc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.split-calc-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--expense);
+}
+
+.split-calc-people {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  height: 40px;
+}
+.split-calc-step {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.split-calc-step:hover { background: var(--expense-light); }
+.split-calc-count {
+  font-size: 0.95rem;
+  font-weight: 700;
+  min-width: 1.4rem;
+  text-align: center;
+  color: var(--color-text);
+}
+
+.split-calc-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-surface);
+  border-radius: 7px;
+  font-size: 0.875rem;
+  color: var(--expense);
+}
+.split-calc-result strong {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+.split-calc-use {
+  background: var(--expense);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.3rem 0.65rem;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.12s;
+}
+.split-calc-use:hover { opacity: 0.85; }
+
+
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -311,81 +433,4 @@
   transition: background 0.12s;
 }
 .split-add:hover { background: rgba(46,125,82,0.07); }
-
-/* ── Bill split (expense) ── */
-.bill-split-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-}
-@media (max-width: 480px) {
-  .bill-split-row { grid-template-columns: 1fr; }
-}
-
-.bill-split-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-.bill-split-label {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--color-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.bill-people-wrap {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.35rem 0.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-}
-.bill-people-btn {
-  width: 26px;
-  height: 26px;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: var(--color-bg);
-  font-size: 1rem;
-  line-height: 1;
-  cursor: pointer;
-  color: var(--color-text);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.bill-people-btn:hover { background: var(--expense-light); }
-.bill-people-count {
-  font-size: 1rem;
-  font-weight: 700;
-  min-width: 1.5rem;
-  text-align: center;
-  color: var(--color-text);
-}
-.bill-people-unit {
-  font-size: 0.8rem;
-  color: var(--color-muted);
-}
-
-.bill-share-result {
-  margin-top: 0.25rem;
-  padding: 0.6rem 0.85rem;
-  background: var(--expense-light);
-  border-radius: 6px;
-  font-size: 0.9rem;
-  color: var(--expense);
-}
-.bill-share-result strong {
-  font-family: var(--font-display);
-  font-size: 1.05rem;
-}
-.bill-share-sub {
-  font-size: 0.8rem;
-  color: var(--color-muted);
-  margin-left: 0.35rem;
-}
 

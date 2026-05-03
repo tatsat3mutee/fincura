@@ -10,17 +10,6 @@ interface Props {
   onSuccess: () => void
 }
 
-interface SplitBucket {
-  label: string
-  pct: number
-}
-
-const DEFAULT_SPLITS: SplitBucket[] = [
-  { label: 'Needs', pct: 50 },
-  { label: 'Wants', pct: 30 },
-  { label: 'Savings', pct: 20 },
-]
-
 export default function TransactionForm({ transaction, onClose, onSuccess }: Props) {
   const editing = !!transaction
   const [type, setType] = useState<'expense' | 'income'>(transaction?.type ?? 'expense')
@@ -34,38 +23,17 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Income split state
-  const [showSplit, setShowSplit] = useState(false)
-  const [splits, setSplits] = useState<SplitBucket[]>(DEFAULT_SPLITS.map(s => ({ ...s })))
-
-  // Bill split state (expense only)
-  const [showBillSplit, setShowBillSplit] = useState(false)
-  const [billTotal, setBillTotal] = useState('')
-  const [billPeople, setBillPeople] = useState(2)
-  const billShare = billTotal ? Math.round((parseFloat(billTotal) / billPeople) * 100) / 100 : 0
-
-  const totalPct = splits.reduce((s, b) => s + (Number(b.pct) || 0), 0)
-  const amountNum = parseFloat(amount) || 0
+  // Split calculator (expense only, not editing)
+  const [showCalc, setShowCalc] = useState(false)
+  const [calcTotal, setCalcTotal] = useState('')
+  const [calcPeople, setCalcPeople] = useState(2)
+  const calcShare = calcTotal ? Math.round((parseFloat(calcTotal) / calcPeople) * 100) / 100 : 0
 
   const filtered = categories.filter(c => c.type === type || c.type === 'both')
   const selectedCat = filtered.find(c => c.id === categoryId)
   const isOther = selectedCat?.name === 'Other'
 
-  // Don't clear the pre-selected category on first render (categories may not have loaded yet)
   const typeChangedRef = useRef(false)
-
-  function updateSplitPct(idx: number, val: string) {
-    setSplits(prev => prev.map((b, i) => i === idx ? { ...b, pct: Number(val) } : b))
-  }
-  function updateSplitLabel(idx: number, val: string) {
-    setSplits(prev => prev.map((b, i) => i === idx ? { ...b, label: val } : b))
-  }
-  function addBucket() {
-    setSplits(prev => [...prev, { label: '', pct: 0 }])
-  }
-  function removeBucket(idx: number) {
-    setSplits(prev => prev.filter((_, i) => i !== idx))
-  }
 
   function loadCategories() {
     setCatsLoading(true)
@@ -85,18 +53,23 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
     }
   }, [type])
 
+  function applyShare() {
+    if (calcShare > 0) {
+      setAmount(String(calcShare))
+      setShowCalc(false)
+      setCalcTotal('')
+      setCalcPeople(2)
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
     if (!categoryId) { setError('Please select a category'); return }
     if (isOther && !note.trim()) { setError('Please describe what "Other" is'); return }
-    if (showSplit && totalPct !== 100) { setError('Income split must total 100%'); return }
-    const finalAmount = showBillSplit && billShare > 0 ? billShare : parseFloat(amount)
+    const finalAmount = parseFloat(amount)
     if (!finalAmount || finalAmount <= 0) { setError('Enter a valid amount'); return }
-    const splitNote = showBillSplit && billShare > 0
-      ? `Split ${billPeople} ways (₹${parseFloat(billTotal).toLocaleString('en-IN')} total)${note ? ' · ' + note : ''}`
-      : note || null
-    const body = { type, amount: finalAmount, category_id: categoryId, note: splitNote, txn_date: txnDate }
+    const body = { type, amount: finalAmount, category_id: categoryId, note: note || null, txn_date: txnDate }
     setLoading(true)
     try {
       if (editing && transaction) {
@@ -134,132 +107,62 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
             >Income</button>
           </div>
 
+          {/* Amount + split calculator */}
           <label className="form-label">
             Amount
-            <input
-              type="number"
-              min="0.01"
-              step="0.01"
-              value={showBillSplit && billShare > 0 ? billShare : amount}
-              onChange={e => { if (!showBillSplit) setAmount(e.target.value) }}
-              readOnly={showBillSplit && !!billTotal}
-              className="form-input"
-              required={!showBillSplit}
-              autoFocus
-              placeholder="0"
-            />
-          </label>
-
-          {/* Bill split — expense only, not editing */}
-          {type === 'expense' && !editing && (
-            <div className="split-section">
-              <button
-                type="button"
-                className={'split-toggle' + (showBillSplit ? ' split-toggle--on' : '')}
-                onClick={() => { setShowBillSplit(v => !v); setBillTotal(''); setBillPeople(2) }}
-              >
-                <span className="split-toggle-icon">{showBillSplit ? '▾' : '▸'}</span>
-                Split this bill
-                {showBillSplit && billShare > 0 && (
-                  <span className="split-toggle-hint"> — your share ₹{billShare.toLocaleString('en-IN')}</span>
-                )}
-              </button>
-
-              {showBillSplit && (
-                <div className="split-panel">
-                  <div className="bill-split-row">
-                    <label className="bill-split-field">
-                      <span className="bill-split-label">Total bill</span>
-                      <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        value={billTotal}
-                        onChange={e => setBillTotal(e.target.value)}
-                        className="form-input"
-                        placeholder="e.g. 727"
-                      />
-                    </label>
-                    <label className="bill-split-field">
-                      <span className="bill-split-label">Split between</span>
-                      <div className="bill-people-wrap">
-                        <button type="button" className="bill-people-btn" onClick={() => setBillPeople(p => Math.max(2, p - 1))}>−</button>
-                        <span className="bill-people-count">{billPeople}</span>
-                        <button type="button" className="bill-people-btn" onClick={() => setBillPeople(p => Math.min(20, p + 1))}>+</button>
-                        <span className="bill-people-unit">people</span>
-                      </div>
-                    </label>
-                  </div>
-                  {billShare > 0 && (
-                    <div className="bill-share-result">
-                      Your share: <strong>₹{billShare.toLocaleString('en-IN')}</strong>
-                      <span className="bill-share-sub"> of ₹{parseFloat(billTotal).toLocaleString('en-IN')} total</span>
-                    </div>
-                  )}
-                </div>
+            <div className="amount-row">
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                className="form-input amount-input"
+                required
+                autoFocus
+                placeholder="0"
+              />
+              {type === 'expense' && !editing && (
+                <button
+                  type="button"
+                  className={'split-calc-btn' + (showCalc ? ' split-calc-btn--on' : '')}
+                  onClick={() => { setShowCalc(v => !v); setCalcTotal(''); setCalcPeople(2) }}
+                  title="Split calculator — enter a total bill and divide it"
+                >÷</button>
               )}
             </div>
-          )}
+          </label>
 
-          {/* Income distribution — only shown for income, not when editing */}
-          {type === 'income' && !editing && (
-            <div className="split-section">
-              <button
-                type="button"
-                className={'split-toggle' + (showSplit ? ' split-toggle--on' : '')}
-                onClick={() => setShowSplit(v => !v)}
-              >
-                <span className="split-toggle-icon">{showSplit ? '▾' : '▸'}</span>
-                Distribute income
-                {showSplit && amountNum > 0 && (
-                  <span className="split-toggle-hint"> — {totalPct}% of ₹{amountNum.toLocaleString('en-IN')}</span>
-                )}
-              </button>
-
-              {showSplit && (
-                <div className="split-panel">
-                  <p className="split-desc">
-                    Split your income into buckets. Each bucket becomes a separate savings-goal top-up note.
-                  </p>
-                  <div className="split-rows">
-                    {splits.map((b, i) => (
-                      <div key={i} className="split-row">
-                        <input
-                          type="text"
-                          value={b.label}
-                          onChange={e => updateSplitLabel(i, e.target.value)}
-                          className="split-label-input"
-                          placeholder="e.g. Savings"
-                        />
-                        <div className="split-pct-wrap">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={b.pct}
-                            onChange={e => updateSplitPct(i, e.target.value)}
-                            className="split-pct-input"
-                          />
-                          <span className="split-pct-sign">%</span>
-                        </div>
-                        <span className="split-amount">
-                          {amountNum > 0 ? '₹' + ((amountNum * b.pct) / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 }) : '—'}
-                        </span>
-                        <button
-                          type="button"
-                          className="split-remove"
-                          onClick={() => removeBucket(i)}
-                          aria-label="Remove"
-                        >✕</button>
-                      </div>
-                    ))}
+          {/* Inline split calculator */}
+          {showCalc && (
+            <div className="split-calc-panel">
+              <div className="split-calc-row">
+                <label className="split-calc-field">
+                  <span className="split-calc-label">Total bill</span>
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={calcTotal}
+                    onChange={e => setCalcTotal(e.target.value)}
+                    className="form-input"
+                    placeholder="e.g. 1200"
+                    autoFocus
+                  />
+                </label>
+                <label className="split-calc-field">
+                  <span className="split-calc-label">People</span>
+                  <div className="split-calc-people">
+                    <button type="button" className="split-calc-step" onClick={() => setCalcPeople(p => Math.max(2, p - 1))}>−</button>
+                    <span className="split-calc-count">{calcPeople}</span>
+                    <button type="button" className="split-calc-step" onClick={() => setCalcPeople(p => Math.min(20, p + 1))}>+</button>
                   </div>
-
-                  <div className={'split-total' + (totalPct !== 100 ? ' split-total--warn' : ' split-total--ok')}>
-                    Total: {totalPct}%{totalPct !== 100 && ' — must equal 100%'}
-                  </div>
-
-                  <button type="button" className="split-add" onClick={addBucket}>+ Add bucket</button>
+                </label>
+              </div>
+              {calcShare > 0 && (
+                <div className="split-calc-result">
+                  <span>Your share: <strong>₹{calcShare.toLocaleString('en-IN')}</strong></span>
+                  <button type="button" className="split-calc-use" onClick={applyShare}>Use this →</button>
                 </div>
               )}
             </div>
@@ -294,7 +197,6 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
             )}
           </div>
 
-          {/* "Other" description — required when Other is selected */}
           {isOther ? (
             <label className="form-label">
               What is this? <span className="form-required">*</span>
@@ -333,7 +235,7 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
 
           {error && <p className="form-error">{error}</p>}
 
-          <button type="submit" disabled={loading || (showSplit && totalPct !== 100)} className="btn-primary btn-full">
+          <button type="submit" disabled={loading} className="btn-primary btn-full">
             {loading ? 'Saving…' : (editing ? 'Save changes' : 'Add transaction')}
           </button>
         </form>
