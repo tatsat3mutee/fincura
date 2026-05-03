@@ -17,7 +17,7 @@ async def list_budgets(month: str, current_user: dict = Depends(get_current_user
 async def create_budget(body: BudgetCreate, current_user: dict = Depends(get_current_user)):
     try:
         budget_id = await db.create_budget(
-            current_user["id"], body.category_id, body.month, body.amount
+            current_user["id"], body.category_id, body.month, body.amount, body.period_months
         )
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail="Budget already exists for this category/month")

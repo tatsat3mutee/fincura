@@ -109,12 +109,20 @@ class BudgetCreate(BaseModel):
     category_id: int
     month: str
     amount: float
+    period_months: int = 1
 
     @field_validator("amount")
     @classmethod
     def amount_positive(cls, v: float) -> float:
         if v <= 0:
             raise ValueError("Amount must be positive")
+        return v
+
+    @field_validator("period_months")
+    @classmethod
+    def period_valid(cls, v: int) -> int:
+        if v not in (1, 2, 3, 6, 12):
+            raise ValueError("period_months must be 1, 2, 3, 6, or 12")
         return v
 
 
@@ -134,6 +142,7 @@ class BudgetOut(BaseModel):
     category_id: int
     month: str
     limit_amount: float
+    period_months: int
     spent: float
     category_name: str
     category_icon: str
@@ -151,6 +160,9 @@ class GoalCreate(BaseModel):
     target_date: str | None = None
     icon: str = "◎"
     color: str = "#1a472a"
+    scheme_type: str | None = None
+    institution: str | None = None
+    scheme_notes: str | None = None
 
     @field_validator("target_amount")
     @classmethod
@@ -167,6 +179,9 @@ class GoalUpdate(BaseModel):
     icon: str | None = None
     color: str | None = None
     status: Literal["active", "completed", "paused"] | None = None
+    scheme_type: str | None = None
+    institution: str | None = None
+    scheme_notes: str | None = None
 
 
 class GoalDeposit(BaseModel):
@@ -189,6 +204,9 @@ class GoalOut(BaseModel):
     icon: str
     color: str
     status: str
+    scheme_type: str | None = None
+    institution: str | None = None
+    scheme_notes: str | None = None
     created_at: str
     updated_at: str
 

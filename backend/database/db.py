@@ -91,6 +91,10 @@ CREATE TABLE IF NOT EXISTS savings_goals (
 
 _SCHEMA_MIGRATIONS = [
     "ALTER TABLE users ADD COLUMN google_id TEXT UNIQUE",
+    "ALTER TABLE budgets ADD COLUMN period_months INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE savings_goals ADD COLUMN scheme_type TEXT",
+    "ALTER TABLE savings_goals ADD COLUMN institution TEXT",
+    "ALTER TABLE savings_goals ADD COLUMN scheme_notes TEXT",
 ]
 
 _SEED_CATEGORIES = [
@@ -367,11 +371,14 @@ async def get_budgets(user_id: int, month: str):
     async with get_db() as db:
         cur = await db.execute(
             "SELECT b.id, b.category_id, b.month, b.amount as limit_amount,"
+            " COALESCE(b.period_months, 1) as period_months,"
             " c.name as category_name, c.icon as category_icon, c.color as category_color,"
             " COALESCE(("
             "  SELECT SUM(t.amount) FROM transactions t"
             "  WHERE t.user_id = ? AND t.category_id = b.category_id"
-            "  AND t.type = 'expense' AND strftime('%Y-%m', t.txn_date) = b.month"
+            "  AND t.type = 'expense'"
+            "  AND t.txn_date >= date(b.month || '-01')"
+            "  AND t.txn_date < date(b.month || '-01', '+' || COALESCE(b.period_months,1) || ' months')"
             " ), 0) as spent"
             " FROM budgets b JOIN categories c ON b.category_id = c.id"
             " WHERE b.user_id = ? AND b.month = ?"
@@ -381,11 +388,11 @@ async def get_budgets(user_id: int, month: str):
         return await cur.fetchall()
 
 
-async def create_budget(user_id: int, category_id: int, month: str, amount: float) -> int:
+async def create_budget(user_id: int, category_id: int, month: str, amount: float, period_months: int = 1) -> int:
     async with get_db() as db:
         cur = await db.execute(
-            "INSERT INTO budgets (user_id, category_id, month, amount) VALUES (?, ?, ?, ?)",
-            (user_id, category_id, month, amount),
+            "INSERT INTO budgets (user_id, category_id, month, amount, period_months) VALUES (?, ?, ?, ?, ?)",
+            (user_id, category_id, month, amount, period_months),
         )
         await db.commit()
         return cur.lastrowid
@@ -433,13 +440,17 @@ async def get_goal(user_id: int, goal_id: int):
 async def create_goal(
     user_id: int, name: str, target_amount: float, saved_amount: float,
     target_date: str | None, icon: str, color: str,
+    scheme_type: str | None = None, institution: str | None = None,
+    scheme_notes: str | None = None,
 ) -> int:
     async with get_db() as db:
         cur = await db.execute(
             "INSERT INTO savings_goals"
-            " (user_id, name, target_amount, saved_amount, target_date, icon, color)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (user_id, name, target_amount, saved_amount, target_date, icon, color),
+            " (user_id, name, target_amount, saved_amount, target_date, icon, color,"
+            "  scheme_type, institution, scheme_notes)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (user_id, name, target_amount, saved_amount, target_date, icon, color,
+             scheme_type, institution, scheme_notes),
         )
         await db.commit()
         return cur.lastrowid
@@ -452,7 +463,8 @@ async def update_goal(user_id: int, goal_id: int, data: dict) -> bool:
     async with get_db() as db:
         await db.execute(
             "UPDATE savings_goals SET name=?, target_amount=?, target_date=?,"
-            " icon=?, color=?, status=?, updated_at=CURRENT_TIMESTAMP"
+            " icon=?, color=?, status=?, scheme_type=?, institution=?, scheme_notes=?,"
+            " updated_at=CURRENT_TIMESTAMP"
             " WHERE id=? AND user_id=?",
             (
                 data.get("name", goal["name"]),
@@ -461,6 +473,9 @@ async def update_goal(user_id: int, goal_id: int, data: dict) -> bool:
                 data.get("icon", goal["icon"]),
                 data.get("color", goal["color"]),
                 data.get("status", goal["status"]),
+                data.get("scheme_type", goal["scheme_type"]),
+                data.get("institution", goal["institution"]),
+                data.get("scheme_notes", goal["scheme_notes"]),
                 goal_id, user_id,
             ),
         )

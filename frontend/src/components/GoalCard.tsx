@@ -66,6 +66,13 @@ export default function GoalCard({ goal, currency, onDeposit, onEdit, onDelete }
         </div>
       )}
 
+      {(goal.scheme_type || goal.institution) && (
+        <div className="goal-scheme-row">
+          {goal.scheme_type && <span className="goal-scheme-badge">{goal.scheme_type}</span>}
+          {goal.institution && <span className="goal-scheme-inst">@ {goal.institution}</span>}
+        </div>
+      )}
+
       {goal.status === 'active' && (
         <button className="goal-deposit-btn" onClick={onDeposit}>+ Deposit</button>
       )}

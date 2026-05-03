@@ -205,3 +205,74 @@
 }
 
 .modal-card--sm { max-width: 320px; }
+.modal-card--wide { max-width: 540px; }
+
+/* Scheme section in form */
+.scheme-section {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.scheme-heading {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.scheme-tip {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.scheme-tip-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--color-text);
+}
+
+.scheme-tip-row span { color: var(--color-muted); }
+.scheme-tip-row strong { font-weight: 600; }
+
+.scheme-tip-note {
+  font-size: 0.775rem;
+  color: var(--accent);
+  margin: 0.25rem 0 0;
+  font-style: italic;
+}
+
+/* Scheme badge on GoalCard */
+.goal-scheme-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.goal-scheme-badge {
+  font-size: 0.725rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 20px;
+  background: #e8f5ee;
+  color: var(--accent);
+  border: 1px solid #c3dfd0;
+  white-space: nowrap;
+}
+
+.goal-scheme-inst {
+  font-size: 0.775rem;
+  color: var(--color-muted);
+}

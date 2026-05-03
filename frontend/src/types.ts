@@ -59,6 +59,7 @@ export interface Budget {
   category_id: number
   month: string
   limit_amount: number
+  period_months: number
   spent: number
   category_name: string
   category_icon: string
@@ -74,6 +75,9 @@ export interface Goal {
   icon: string
   color: string
   status: 'active' | 'completed' | 'paused'
+  scheme_type: string | null
+  institution: string | null
+  scheme_notes: string | null
   created_at: string
   updated_at: string
 }

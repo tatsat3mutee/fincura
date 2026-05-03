@@ -18,6 +18,7 @@ async def create_goal(body: GoalCreate, current_user: dict = Depends(get_current
         current_user["id"],
         body.name, body.target_amount, body.saved_amount,
         body.target_date, body.icon, body.color,
+        body.scheme_type, body.institution, body.scheme_notes,
     )
     row = await db.get_goal(current_user["id"], goal_id)
     return dict(row)
