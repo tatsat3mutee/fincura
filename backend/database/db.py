@@ -1,0 +1,616 @@
+import aiosqlite
+import random
+import string
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+DB_PATH = Path(__file__).parent.parent / "fincura.db"
+
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    id            INTEGER PRIMARY KEY,
+    name          TEXT    NOT NULL,
+    email         TEXT    NOT NULL UNIQUE,
+    password_hash TEXT,
+    google_id     TEXT    UNIQUE,
+    currency      TEXT    NOT NULL DEFAULT 'INR',
+    created_at    TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS households (
+    id          INTEGER PRIMARY KEY,
+    name        TEXT    NOT NULL,
+    invite_code TEXT    NOT NULL UNIQUE,
+    created_by  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS household_members (
+    id           INTEGER PRIMARY KEY,
+    household_id INTEGER NOT NULL REFERENCES households(id) ON DELETE CASCADE,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role         TEXT    NOT NULL DEFAULT 'member' CHECK(role IN ('owner','member')),
+    joined_at    TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(household_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS categories (
+    id             INTEGER PRIMARY KEY,
+    user_id        INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    name           TEXT    NOT NULL,
+    icon           TEXT    NOT NULL DEFAULT '◎',
+    color          TEXT    NOT NULL DEFAULT '#1a472a',
+    type           TEXT    NOT NULL DEFAULT 'both' CHECK(type IN ('expense','income','both')),
+    system_default INTEGER NOT NULL DEFAULT 0,
+    sort_order     INTEGER NOT NULL DEFAULT 99
+);
+
+CREATE TABLE IF NOT EXISTS transactions (
+    id           INTEGER PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    household_id INTEGER REFERENCES households(id) ON DELETE SET NULL,
+    category_id  INTEGER NOT NULL REFERENCES categories(id),
+    type         TEXT    NOT NULL CHECK(type IN ('expense','income')),
+    amount       REAL    NOT NULL CHECK(amount > 0),
+    note         TEXT,
+    txn_date     TEXT    NOT NULL,
+    visibility   TEXT    NOT NULL DEFAULT 'personal' CHECK(visibility IN ('personal','shared')),
+    created_at   TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_txn_user_date ON transactions(user_id, txn_date DESC);
+CREATE INDEX IF NOT EXISTS idx_txn_household  ON transactions(household_id, txn_date DESC);
+
+CREATE TABLE IF NOT EXISTS budgets (
+    id           INTEGER PRIMARY KEY,
+    user_id      INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    household_id INTEGER REFERENCES households(id) ON DELETE CASCADE,
+    category_id  INTEGER NOT NULL REFERENCES categories(id),
+    month        TEXT    NOT NULL,
+    amount       REAL    NOT NULL CHECK(amount > 0),
+    created_at   TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, category_id, month),
+    UNIQUE(household_id, category_id, month)
+);
+
+CREATE TABLE IF NOT EXISTS savings_goals (
+    id            INTEGER PRIMARY KEY,
+    user_id       INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    household_id  INTEGER REFERENCES households(id) ON DELETE CASCADE,
+    name          TEXT    NOT NULL,
+    target_amount REAL    NOT NULL CHECK(target_amount > 0),
+    saved_amount  REAL    NOT NULL DEFAULT 0 CHECK(saved_amount >= 0),
+    target_date   TEXT,
+    icon          TEXT    NOT NULL DEFAULT '◎',
+    color         TEXT    NOT NULL DEFAULT '#1a472a',
+    status        TEXT    NOT NULL DEFAULT 'active' CHECK(status IN ('active','completed','paused')),
+    created_at    TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+"""
+
+_SCHEMA_MIGRATIONS = [
+    "ALTER TABLE users ADD COLUMN google_id TEXT UNIQUE",
+]
+
+_SEED_CATEGORIES = [
+    ("Food & Drink",       "🍜", "#c17f24", "expense", 1),
+    ("Transport",          "🚌", "#5b7fa6", "expense", 2),
+    ("Housing & Bills",    "🏠", "#1a472a", "expense", 3),
+    ("Health",             "💊", "#8b5e83", "expense", 4),
+    ("Shopping",           "🛍️",  "#d4875e", "expense", 5),
+    ("Entertainment",      "🎬", "#6b8e5e", "expense", 6),
+    ("Education",          "📚", "#4a7fa5", "expense", 7),
+    ("Travel",             "✈️",  "#7a9e7e", "expense", 8),
+    ("Personal Care",      "🪥", "#b88db0", "expense", 9),
+    ("Gifts & Donations",  "🎁", "#c0724a", "expense", 10),
+    ("Salary",             "💼", "#2e7d52", "income",  11),
+    ("Freelance",          "💻", "#357abd", "income",  12),
+    ("Business",           "📈", "#1a472a", "income",  13),
+    ("Investment Returns", "📊", "#4a8c6a", "income",  14),
+    ("Other",              "◎",  "#6b6b6b", "both",    15),
+]
+
+
+@asynccontextmanager
+async def get_db():
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        await db.execute("PRAGMA foreign_keys = ON")
+        yield db
+
+
+async def init_db() -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("PRAGMA foreign_keys = ON")
+        await db.executescript(_SCHEMA)
+        await db.commit()
+        for migration in _SCHEMA_MIGRATIONS:
+            try:
+                await db.execute(migration)
+                await db.commit()
+            except Exception:
+                pass
+
+
+async def seed_db() -> None:
+    async with get_db() as db:
+        row = await db.execute("SELECT COUNT(*) FROM categories WHERE system_default = 1")
+        count = (await row.fetchone())[0]
+        if count:
+            return
+        await db.executemany(
+            "INSERT INTO categories (user_id, name, icon, color, type, system_default, sort_order)"
+            " VALUES (NULL, ?, ?, ?, ?, 1, ?)",
+            _SEED_CATEGORIES,
+        )
+        await db.commit()
+
+
+# ── User queries ─────────────────────────────────────────────────────────────
+
+async def create_user(name: str, email: str, password_hash: str) -> int:
+    async with get_db() as db:
+        cur = await db.execute(
+            "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
+            (name, email, password_hash),
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_user_by_email(email: str):
+    async with get_db() as db:
+        cur = await db.execute("SELECT * FROM users WHERE email = ?", (email,))
+        return await cur.fetchone()
+
+
+async def get_user_by_id(user_id: int):
+    async with get_db() as db:
+        cur = await db.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+        return await cur.fetchone()
+
+
+async def get_user_by_google_id(google_id: str):
+    async with get_db() as db:
+        cur = await db.execute("SELECT * FROM users WHERE google_id = ?", (google_id,))
+        return await cur.fetchone()
+
+
+async def create_google_user(name: str, email: str, google_id: str) -> int:
+    async with get_db() as db:
+        cur = await db.execute(
+            "INSERT INTO users (name, email, password_hash, google_id) VALUES (?, ?, NULL, ?)",
+            (name, email, google_id),
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def link_google_account(user_id: int, google_id: str) -> None:
+    async with get_db() as db:
+        await db.execute("UPDATE users SET google_id = ? WHERE id = ?", (google_id, user_id))
+        await db.commit()
+
+
+# ── Category queries ──────────────────────────────────────────────────────────
+
+async def get_categories(user_id: int):
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT * FROM categories WHERE system_default = 1 OR user_id = ? ORDER BY sort_order",
+            (user_id,),
+        )
+        return await cur.fetchall()
+
+
+# ── Transaction queries ───────────────────────────────────────────────────────
+
+async def create_transaction(
+    user_id: int, txn_type: str, amount: float, category_id: int,
+    note: str | None, txn_date: str, visibility: str = "personal",
+) -> int:
+    async with get_db() as db:
+        cur = await db.execute(
+            "INSERT INTO transactions (user_id, type, amount, category_id, note, txn_date, visibility)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (user_id, txn_type, amount, category_id, note, txn_date, visibility),
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_transaction(user_id: int, txn_id: int):
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT t.*, c.name as category_name, c.icon as category_icon, c.color as category_color"
+            " FROM transactions t JOIN categories c ON t.category_id = c.id"
+            " WHERE t.id = ? AND t.user_id = ?",
+            (txn_id, user_id),
+        )
+        return await cur.fetchone()
+
+
+async def get_transactions(
+    user_id: int, *,
+    txn_type: str | None = None,
+    category_id: int | None = None,
+    month: str | None = None,
+    q: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    sql = (
+        "SELECT t.*, c.name as category_name, c.icon as category_icon, c.color as category_color"
+        " FROM transactions t JOIN categories c ON t.category_id = c.id"
+        " WHERE t.user_id = ?"
+    )
+    params: list = [user_id]
+    if txn_type:
+        sql += " AND t.type = ?"
+        params.append(txn_type)
+    if category_id:
+        sql += " AND t.category_id = ?"
+        params.append(category_id)
+    if month:
+        sql += " AND strftime('%Y-%m', t.txn_date) = ?"
+        params.append(month)
+    if q:
+        sql += " AND t.note LIKE ?"
+        params.append("%" + q + "%")
+    sql += " ORDER BY t.txn_date DESC, t.id DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+    async with get_db() as db:
+        cur = await db.execute(sql, params)
+        return await cur.fetchall()
+
+
+async def update_transaction(user_id: int, txn_id: int, data: dict) -> bool:
+    current = await get_transaction(user_id, txn_id)
+    if not current:
+        return False
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE transactions SET type=?, amount=?, category_id=?, note=?, txn_date=?,"
+            " visibility=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?",
+            (
+                data.get("type", current["type"]),
+                data.get("amount", current["amount"]),
+                data.get("category_id", current["category_id"]),
+                data.get("note", current["note"]),
+                data.get("txn_date", current["txn_date"]),
+                data.get("visibility", current["visibility"]),
+                txn_id, user_id,
+            ),
+        )
+        await db.commit()
+    return True
+
+
+async def delete_transaction(user_id: int, txn_id: int) -> bool:
+    async with get_db() as db:
+        cur = await db.execute(
+            "DELETE FROM transactions WHERE id = ? AND user_id = ?", (txn_id, user_id)
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def get_recent_transactions(user_id: int, limit: int = 5):
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT t.*, c.name as category_name, c.icon as category_icon, c.color as category_color"
+            " FROM transactions t JOIN categories c ON t.category_id = c.id"
+            " WHERE t.user_id = ?"
+            " ORDER BY t.txn_date DESC, t.id DESC LIMIT ?",
+            (user_id, limit),
+        )
+        return await cur.fetchall()
+
+
+# ── Chart / summary queries ───────────────────────────────────────────────────
+
+async def get_monthly_summary(user_id: int, month: str) -> dict:
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT type, SUM(amount) as total FROM transactions"
+            " WHERE user_id = ? AND strftime('%Y-%m', txn_date) = ? GROUP BY type",
+            (user_id, month),
+        )
+        rows = await cur.fetchall()
+    result: dict = {"income": 0.0, "expense": 0.0}
+    for row in rows:
+        result[row["type"]] = row["total"]
+    result["net"] = result["income"] - result["expense"]
+    return result
+
+
+async def get_monthly_trend(user_id: int, months: int = 6):
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT strftime('%Y-%m', txn_date) as month, type, SUM(amount) as total"
+            " FROM transactions"
+            " WHERE user_id = ? AND txn_date >= date('now', '-' || ? || ' months')"
+            " GROUP BY strftime('%Y-%m', txn_date), type ORDER BY month",
+            (user_id, months),
+        )
+        return await cur.fetchall()
+
+
+async def get_category_breakdown(user_id: int, month: str):
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT c.name, c.color, c.icon, SUM(t.amount) as total"
+            " FROM transactions t JOIN categories c ON t.category_id = c.id"
+            " WHERE t.user_id = ? AND t.type = 'expense' AND strftime('%Y-%m', t.txn_date) = ?"
+            " GROUP BY c.id ORDER BY total DESC",
+            (user_id, month),
+        )
+        return await cur.fetchall()
+
+
+async def get_daily_spend(user_id: int, month: str):
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT strftime('%d', txn_date) as day, SUM(amount) as total"
+            " FROM transactions"
+            " WHERE user_id = ? AND type = 'expense' AND strftime('%Y-%m', txn_date) = ?"
+            " GROUP BY strftime('%d', txn_date) ORDER BY day",
+            (user_id, month),
+        )
+        return await cur.fetchall()
+
+
+# ── Budget queries ────────────────────────────────────────────────────────────
+
+async def get_budgets(user_id: int, month: str):
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT b.id, b.category_id, b.month, b.amount as limit_amount,"
+            " c.name as category_name, c.icon as category_icon, c.color as category_color,"
+            " COALESCE(("
+            "  SELECT SUM(t.amount) FROM transactions t"
+            "  WHERE t.user_id = ? AND t.category_id = b.category_id"
+            "  AND t.type = 'expense' AND strftime('%Y-%m', t.txn_date) = b.month"
+            " ), 0) as spent"
+            " FROM budgets b JOIN categories c ON b.category_id = c.id"
+            " WHERE b.user_id = ? AND b.month = ?"
+            " ORDER BY c.sort_order",
+            (user_id, user_id, month),
+        )
+        return await cur.fetchall()
+
+
+async def create_budget(user_id: int, category_id: int, month: str, amount: float) -> int:
+    async with get_db() as db:
+        cur = await db.execute(
+            "INSERT INTO budgets (user_id, category_id, month, amount) VALUES (?, ?, ?, ?)",
+            (user_id, category_id, month, amount),
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def update_budget(user_id: int, budget_id: int, amount: float) -> bool:
+    async with get_db() as db:
+        cur = await db.execute(
+            "UPDATE budgets SET amount = ? WHERE id = ? AND user_id = ?",
+            (amount, budget_id, user_id),
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def delete_budget(user_id: int, budget_id: int) -> bool:
+    async with get_db() as db:
+        cur = await db.execute(
+            "DELETE FROM budgets WHERE id = ? AND user_id = ?", (budget_id, user_id)
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+# ── Savings goal queries ──────────────────────────────────────────────────────
+
+async def get_goals(user_id: int):
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT * FROM savings_goals WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,),
+        )
+        return await cur.fetchall()
+
+
+async def get_goal(user_id: int, goal_id: int):
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT * FROM savings_goals WHERE id = ? AND user_id = ?",
+            (goal_id, user_id),
+        )
+        return await cur.fetchone()
+
+
+async def create_goal(
+    user_id: int, name: str, target_amount: float, saved_amount: float,
+    target_date: str | None, icon: str, color: str,
+) -> int:
+    async with get_db() as db:
+        cur = await db.execute(
+            "INSERT INTO savings_goals"
+            " (user_id, name, target_amount, saved_amount, target_date, icon, color)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (user_id, name, target_amount, saved_amount, target_date, icon, color),
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def update_goal(user_id: int, goal_id: int, data: dict) -> bool:
+    goal = await get_goal(user_id, goal_id)
+    if not goal:
+        return False
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE savings_goals SET name=?, target_amount=?, target_date=?,"
+            " icon=?, color=?, status=?, updated_at=CURRENT_TIMESTAMP"
+            " WHERE id=? AND user_id=?",
+            (
+                data.get("name", goal["name"]),
+                data.get("target_amount", goal["target_amount"]),
+                data.get("target_date", goal["target_date"]),
+                data.get("icon", goal["icon"]),
+                data.get("color", goal["color"]),
+                data.get("status", goal["status"]),
+                goal_id, user_id,
+            ),
+        )
+        await db.commit()
+    return True
+
+
+async def delete_goal(user_id: int, goal_id: int) -> bool:
+    async with get_db() as db:
+        cur = await db.execute(
+            "DELETE FROM savings_goals WHERE id = ? AND user_id = ?", (goal_id, user_id)
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def deposit_to_goal(user_id: int, goal_id: int, amount: float) -> bool:
+    goal = await get_goal(user_id, goal_id)
+    if not goal:
+        return False
+    new_saved = min(goal["saved_amount"] + amount, goal["target_amount"])
+    new_status = "completed" if new_saved >= goal["target_amount"] else goal["status"]
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE savings_goals SET saved_amount=?, status=?, updated_at=CURRENT_TIMESTAMP"
+            " WHERE id=? AND user_id=?",
+            (new_saved, new_status, goal_id, user_id),
+        )
+        await db.commit()
+    return True
+
+
+# ── Household queries ─────────────────────────────────────────────────────────
+
+def _gen_invite_code() -> str:
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+
+
+async def get_user_household(user_id: int):
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT h.*, hm.role FROM households h"
+            " JOIN household_members hm ON h.id = hm.household_id"
+            " WHERE hm.user_id = ?",
+            (user_id,),
+        )
+        return await cur.fetchone()
+
+
+async def get_household_members(household_id: int):
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT u.id, u.name, u.email, hm.role, hm.joined_at"
+            " FROM household_members hm JOIN users u ON hm.user_id = u.id"
+            " WHERE hm.household_id = ? ORDER BY hm.joined_at",
+            (household_id,),
+        )
+        return await cur.fetchall()
+
+
+async def create_household(user_id: int, name: str) -> int:
+    invite_code = _gen_invite_code()
+    async with get_db() as db:
+        cur = await db.execute(
+            "INSERT INTO households (name, invite_code, created_by) VALUES (?, ?, ?)",
+            (name, invite_code, user_id),
+        )
+        household_id = cur.lastrowid
+        await db.execute(
+            "INSERT INTO household_members (household_id, user_id, role) VALUES (?, ?, 'owner')",
+            (household_id, user_id),
+        )
+        await db.commit()
+        return household_id
+
+
+async def join_household(user_id: int, invite_code: str):
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT id FROM households WHERE invite_code = ?", (invite_code,)
+        )
+        row = await cur.fetchone()
+        if not row:
+            return None
+        household_id = row["id"]
+        try:
+            await db.execute(
+                "INSERT INTO household_members (household_id, user_id) VALUES (?, ?)",
+                (household_id, user_id),
+            )
+            await db.commit()
+        except Exception:
+            return None
+        return household_id
+
+
+async def leave_household(user_id: int, household_id: int) -> bool:
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT role FROM household_members WHERE household_id=? AND user_id=?",
+            (household_id, user_id),
+        )
+        mem = await cur.fetchone()
+        if not mem:
+            return False
+        if mem["role"] == "owner":
+            cnt = await db.execute(
+                "SELECT COUNT(*) FROM household_members WHERE household_id=?", (household_id,)
+            )
+            count = (await cnt.fetchone())[0]
+            if count > 1:
+                return False
+            await db.execute("DELETE FROM households WHERE id=?", (household_id,))
+        else:
+            await db.execute(
+                "DELETE FROM household_members WHERE household_id=? AND user_id=?",
+                (household_id, user_id),
+            )
+        await db.commit()
+        return True
+
+
+# ── Profile queries ───────────────────────────────────────────────────────────
+
+async def update_user_profile(user_id: int, name: str, currency: str) -> bool:
+    async with get_db() as db:
+        cur = await db.execute(
+            "UPDATE users SET name=?, currency=? WHERE id=?", (name, currency, user_id)
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def update_user_password(user_id: int, new_hash: str) -> bool:
+    async with get_db() as db:
+        cur = await db.execute(
+            "UPDATE users SET password_hash=? WHERE id=?", (new_hash, user_id)
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def get_user_stats(user_id: int) -> dict:
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT COUNT(*) as total_txns,"
+            " COALESCE(SUM(CASE WHEN type='expense' THEN amount END), 0) as total_spent,"
+            " COALESCE(SUM(CASE WHEN type='income' THEN amount END), 0) as total_earned"
+            " FROM transactions WHERE user_id=?",
+            (user_id,),
+        )
+        row = await cur.fetchone()
+        return dict(row) if row else {"total_txns": 0, "total_spent": 0.0, "total_earned": 0.0}

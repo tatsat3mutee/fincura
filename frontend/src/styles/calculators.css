@@ -1,0 +1,144 @@
+.calc-page { width: 100%; }
+
+.calc-intro {
+  color: var(--color-muted);
+  margin: 0.5rem 0 1.5rem;
+  font-size: 0.9rem;
+}
+
+.calc-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.calc-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+  text-align: left;
+}
+
+.calc-tab:hover {
+  border-color: var(--color-primary);
+}
+
+.calc-tab--active {
+  border-color: var(--color-primary);
+  background: var(--income-light);
+}
+
+.calc-tab-label {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.calc-tab--active .calc-tab-label { color: var(--color-primary); }
+
+.calc-tab-sub {
+  font-size: 0.72rem;
+  color: var(--color-muted);
+}
+
+.calc-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
+.calc-panel-title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  color: var(--color-text);
+  margin-bottom: 1.25rem;
+}
+
+.calc-panel-sub {
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--color-muted);
+}
+
+.calc-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (max-width: 600px) {
+  .calc-body { grid-template-columns: 1fr; }
+}
+
+.calc-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.calc-note {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  background: var(--color-bg);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  line-height: 1.5;
+}
+
+.calc-result {
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  padding: 1.125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.calc-result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+.calc-result-row strong {
+  color: var(--color-text);
+  font-family: var(--font-display);
+}
+
+.calc-result-gain { color: var(--income) !important; }
+
+.calc-result-row--total {
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.5rem;
+  margin-top: 0.25rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.calc-result-row--total strong {
+  font-size: 1.1rem;
+  color: var(--color-primary);
+}
+
+.calc-result-extra {
+  font-size: 0.82rem;
+  color: var(--color-primary);
+  background: var(--income-light);
+  border-radius: 6px;
+  padding: 0.4rem 0.625rem;
+  margin-top: 0.25rem;
+}

@@ -1,0 +1,198 @@
+.household-page { max-width: 600px; width: 100%; margin: 0 auto; }
+
+@media (max-width: 480px) {
+  .household-options { grid-template-columns: 1fr; }
+  .household-form { max-width: 100%; }
+  .household-invite-card { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+}
+
+.household-intro {
+  color: var(--color-muted);
+  margin-bottom: 1.5rem;
+}
+
+.household-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.household-option-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.household-option-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow);
+}
+
+.household-option-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.household-option-title {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.household-option-desc {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.household-form {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 400px;
+}
+
+.household-form-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  color: var(--color-text);
+}
+
+.household-form-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.btn-secondary {
+  padding: 0.55rem 1.125rem;
+  background: transparent;
+  color: var(--color-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+
+.btn-secondary:hover { border-color: var(--color-text); color: var(--color-text); }
+
+.household-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.household-role-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.household-role-badge--owner {
+  background: var(--income-light);
+  color: var(--income);
+}
+
+.household-role-badge--member {
+  background: var(--color-bg);
+  color: var(--color-muted);
+  border: 1px solid var(--color-border);
+}
+
+.household-invite-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.household-invite-label {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  margin-bottom: 0.25rem;
+}
+
+.household-invite-code {
+  font-family: monospace;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--color-primary);
+}
+
+.household-invite-hint {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  margin-top: 0.25rem;
+}
+
+.household-members-section { margin-bottom: 1.5rem; }
+.household-members-section .section-title { margin-bottom: 0.75rem; }
+
+.household-member-row {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.household-member-row:last-child { border-bottom: none; }
+
+.household-member-avatar {
+  width: 36px;
+  height: 36px;
+  font-size: 0.875rem;
+}
+
+.household-member-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.household-member-name {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.household-member-email {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+}
+
+.household-leave-btn {
+  background: none;
+  border: 1px solid #fecaca;
+  color: var(--expense);
+  border-radius: 8px;
+  padding: 0.55rem 1rem;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.household-leave-btn:hover { background: var(--expense-light); }
