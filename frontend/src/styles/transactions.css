@@ -9,7 +9,136 @@
   margin-bottom: 1.25rem;
 }
 
+/* ── Tabs ── */
+.money-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--color-border);
+  margin-bottom: 1.25rem;
+}
+
+.money-tab {
+  position: relative;
+  background: none;
+  border: none;
+  padding: 0.6rem 1.25rem;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: color 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.money-tab:hover { color: var(--color-text); }
+.money-tab--on { color: var(--accent); }
+.money-tab--on::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0; right: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
+}
+
+.money-tab-badge {
+  background: var(--color-border);
+  color: var(--color-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 20px;
+}
+.money-tab--on .money-tab-badge { background: var(--accent); color: #fff; }
+
+/* ── Mini budget health strip ── */
+.txn-budget-strip {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.txn-budget-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.65rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: border-color 0.12s;
+  white-space: nowrap;
+}
+.txn-budget-chip:hover { border-color: var(--accent); }
+
+.txn-budget-chip-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.txn-budget-chip-bar {
+  width: 48px;
+  height: 5px;
+  background: var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.txn-budget-chip-bar > div { height: 100%; border-radius: 10px; transition: width 0.3s; }
+
+.txn-budget-chip-pct { font-size: 0.7rem; font-weight: 700; }
+
 .txn-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.filter-input {
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  outline: none;
+}
+
+.filter-input:focus { border-color: var(--color-primary); }
+
+.txn-totals {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.income-badge {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--income);
+  background: var(--income-light);
+  padding: 0.25rem 0.625rem;
+  border-radius: 20px;
+}
+
+.expense-badge {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--expense);
+  background: var(--expense-light);
+  padding: 0.25rem 0.625rem;
+  border-radius: 20px;
+}
+
   display: flex;
   align-items: center;
   gap: 0.75rem;

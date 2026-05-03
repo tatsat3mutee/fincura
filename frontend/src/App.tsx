@@ -7,7 +7,6 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Transactions from './pages/Transactions'
 import OAuthCallback from './pages/OAuthCallback'
-import Budgets from './pages/Budgets'
 import Goals from './pages/Goals'
 import Household from './pages/Household'
 import Profile from './pages/Profile'
@@ -65,7 +64,7 @@ export default function App() {
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
           <Route path="/income" element={<PrivateRoute><Income /></PrivateRoute>} />
-          <Route path="/budgets" element={<PrivateRoute><Budgets /></PrivateRoute>} />
+          <Route path="/budgets" element={<Navigate to="/transactions" replace />} />
           <Route path="/goals" element={<PrivateRoute><Goals /></PrivateRoute>} />
           <Route path="/household" element={<PrivateRoute><Household /></PrivateRoute>} />
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
