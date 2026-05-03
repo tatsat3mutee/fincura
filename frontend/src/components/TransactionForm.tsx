@@ -10,6 +10,17 @@ interface Props {
   onSuccess: () => void
 }
 
+interface SplitBucket {
+  label: string
+  pct: number
+}
+
+const DEFAULT_SPLITS: SplitBucket[] = [
+  { label: 'Needs', pct: 50 },
+  { label: 'Wants', pct: 30 },
+  { label: 'Savings', pct: 20 },
+]
+
 export default function TransactionForm({ transaction, onClose, onSuccess }: Props) {
   const editing = !!transaction
   const [type, setType] = useState<'expense' | 'income'>(transaction?.type ?? 'expense')
@@ -22,6 +33,26 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
   const [catsError, setCatsError] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Income split state
+  const [showSplit, setShowSplit] = useState(false)
+  const [splits, setSplits] = useState<SplitBucket[]>(DEFAULT_SPLITS.map(s => ({ ...s })))
+
+  const totalPct = splits.reduce((s, b) => s + (Number(b.pct) || 0), 0)
+  const amountNum = parseFloat(amount) || 0
+
+  function updateSplitPct(idx: number, val: string) {
+    setSplits(prev => prev.map((b, i) => i === idx ? { ...b, pct: Number(val) } : b))
+  }
+  function updateSplitLabel(idx: number, val: string) {
+    setSplits(prev => prev.map((b, i) => i === idx ? { ...b, label: val } : b))
+  }
+  function addBucket() {
+    setSplits(prev => [...prev, { label: '', pct: 0 }])
+  }
+  function removeBucket(idx: number) {
+    setSplits(prev => prev.filter((_, i) => i !== idx))
+  }
 
   function loadCategories() {
     setCatsLoading(true)
@@ -46,6 +77,7 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
     e.preventDefault()
     setError('')
     if (!categoryId) { setError('Please select a category'); return }
+    if (showSplit && totalPct !== 100) { setError('Income split must total 100%'); return }
     const body = { type, amount: parseFloat(amount), category_id: categoryId, note: note || null, txn_date: txnDate }
     setLoading(true)
     try {
@@ -99,6 +131,70 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
             />
           </label>
 
+          {/* Income distribution — only shown for income, not when editing */}
+          {type === 'income' && !editing && (
+            <div className="split-section">
+              <button
+                type="button"
+                className={'split-toggle' + (showSplit ? ' split-toggle--on' : '')}
+                onClick={() => setShowSplit(v => !v)}
+              >
+                <span className="split-toggle-icon">{showSplit ? '▾' : '▸'}</span>
+                Distribute income
+                {showSplit && amountNum > 0 && (
+                  <span className="split-toggle-hint"> — {totalPct}% of ₹{amountNum.toLocaleString('en-IN')}</span>
+                )}
+              </button>
+
+              {showSplit && (
+                <div className="split-panel">
+                  <p className="split-desc">
+                    Split your income into buckets. Each bucket becomes a separate savings-goal top-up note.
+                  </p>
+                  <div className="split-rows">
+                    {splits.map((b, i) => (
+                      <div key={i} className="split-row">
+                        <input
+                          type="text"
+                          value={b.label}
+                          onChange={e => updateSplitLabel(i, e.target.value)}
+                          className="split-label-input"
+                          placeholder="e.g. Savings"
+                        />
+                        <div className="split-pct-wrap">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={b.pct}
+                            onChange={e => updateSplitPct(i, e.target.value)}
+                            className="split-pct-input"
+                          />
+                          <span className="split-pct-sign">%</span>
+                        </div>
+                        <span className="split-amount">
+                          {amountNum > 0 ? '₹' + ((amountNum * b.pct) / 100).toLocaleString('en-IN', { maximumFractionDigits: 0 }) : '—'}
+                        </span>
+                        <button
+                          type="button"
+                          className="split-remove"
+                          onClick={() => removeBucket(i)}
+                          aria-label="Remove"
+                        >✕</button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className={'split-total' + (totalPct !== 100 ? ' split-total--warn' : ' split-total--ok')}>
+                    Total: {totalPct}%{totalPct !== 100 && ' — must equal 100%'}
+                  </div>
+
+                  <button type="button" className="split-add" onClick={addBucket}>+ Add bucket</button>
+                </div>
+              )}
+            </div>
+          )}
+
           <label className="form-label">
             Category
             {catsError ? (
@@ -145,7 +241,7 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
 
           {error && <p className="form-error">{error}</p>}
 
-          <button type="submit" disabled={loading} className="btn-primary btn-full">
+          <button type="submit" disabled={loading || (showSplit && totalPct !== 100)} className="btn-primary btn-full">
             {loading ? 'Saving…' : (editing ? 'Save changes' : 'Add transaction')}
           </button>
         </form>
