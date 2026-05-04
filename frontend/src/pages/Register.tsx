@@ -6,7 +6,7 @@ import '../styles/auth.css'
 
 interface RegisterResponse {
   access_token: string
-  user: { id: number; name: string; email: string; currency: string; created_at: string }
+  user: { id: number; name: string; email: string; currency: string; created_at: string; email_verified: boolean }
 }
 
 export default function Register() {

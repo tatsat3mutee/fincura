@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../api/client'
+import { api, setAccessToken } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import type { User } from '../types'
 
@@ -18,17 +18,19 @@ export default function OAuthCallback() {
       return
     }
 
-    localStorage.setItem('token', token)
+    // Store the access token in module memory (not localStorage)
+    setAccessToken(token)
     api.get<User>('/auth/me')
       .then(user => {
         login(token, user)
         navigate('/dashboard')
       })
       .catch(() => {
-        localStorage.removeItem('token')
+        setAccessToken(null)
         navigate('/login?error=auth_failed')
       })
   }, [])
 
   return <div className="app-loading">Signing you in…</div>
 }
+

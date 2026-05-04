@@ -1,20 +1,13 @@
 from typing import Literal
-from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
 class UserRegister(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=100)
     email: EmailStr
-    password: str
-
-    @field_validator("password")
-    @classmethod
-    def password_min_length(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters")
-        return v
+    password: str = Field(min_length=8, max_length=128)
 
 
 class UserLogin(BaseModel):
@@ -28,6 +21,7 @@ class UserOut(BaseModel):
     email: str
     currency: str
     created_at: str
+    email_verified: bool = False
 
 
 class TokenOut(BaseModel):
@@ -52,37 +46,26 @@ class CategoryOut(BaseModel):
 
 class TransactionCreate(BaseModel):
     type: Literal["expense", "income"]
-    amount: float
+    amount: float = Field(gt=0, le=10_000_000)
     category_id: int
-    note: str | None = None
-    txn_date: str
+    note: str | None = Field(default=None, max_length=500)
+    txn_date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
     visibility: Literal["personal", "shared"] = "personal"
-
-    @field_validator("amount")
-    @classmethod
-    def amount_positive(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("Amount must be positive")
-        return v
-
-    @field_validator("txn_date")
-    @classmethod
-    def valid_date(cls, v: str) -> str:
-        from datetime import date
-        try:
-            date.fromisoformat(v)
-        except ValueError:
-            raise ValueError("txn_date must be YYYY-MM-DD")
-        return v
+    is_recurring: bool = False
+    recurrence_rule: str | None = Field(default=None, max_length=50)
+    recurrence_end_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
 
 
 class TransactionUpdate(BaseModel):
     type: Literal["expense", "income"] | None = None
-    amount: float | None = None
+    amount: float | None = Field(default=None, gt=0, le=10_000_000)
     category_id: int | None = None
-    note: str | None = None
-    txn_date: str | None = None
+    note: str | None = Field(default=None, max_length=500)
+    txn_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     visibility: Literal["personal", "shared"] | None = None
+    is_recurring: bool | None = None
+    recurrence_rule: str | None = Field(default=None, max_length=50)
+    recurrence_end_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
 
 
 class TransactionOut(BaseModel):
@@ -99,6 +82,9 @@ class TransactionOut(BaseModel):
     category_name: str
     category_icon: str
     category_color: str
+    is_recurring: bool = False
+    recurrence_rule: str | None = None
+    recurrence_end_date: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -107,16 +93,9 @@ class TransactionOut(BaseModel):
 
 class BudgetCreate(BaseModel):
     category_id: int
-    month: str
-    amount: float
-    period_months: int = 1
-
-    @field_validator("amount")
-    @classmethod
-    def amount_positive(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("Amount must be positive")
-        return v
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    amount: float = Field(gt=0, le=10_000_000)
+    period_months: int = Field(default=1)
 
     @field_validator("period_months")
     @classmethod
@@ -127,14 +106,7 @@ class BudgetCreate(BaseModel):
 
 
 class BudgetUpdate(BaseModel):
-    amount: float
-
-    @field_validator("amount")
-    @classmethod
-    def amount_positive(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("Amount must be positive")
-        return v
+    amount: float = Field(gt=0, le=10_000_000)
 
 
 class BudgetOut(BaseModel):
@@ -154,22 +126,15 @@ class BudgetOut(BaseModel):
 # ── Goals ─────────────────────────────────────────────────────────────────────
 
 class GoalCreate(BaseModel):
-    name: str
-    target_amount: float
-    saved_amount: float = 0.0
-    target_date: str | None = None
-    icon: str = "◎"
-    color: str = "#1a472a"
-    scheme_type: str | None = None
-    institution: str | None = None
-    scheme_notes: str | None = None
-
-    @field_validator("target_amount")
-    @classmethod
-    def target_positive(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("Target amount must be positive")
-        return v
+    name: str = Field(min_length=1, max_length=100)
+    target_amount: float = Field(gt=0, le=100_000_000)
+    saved_amount: float = Field(default=0.0, ge=0)
+    target_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    icon: str = Field(default="◎", max_length=10)
+    color: str = Field(default="#1a472a", pattern=r"^#[0-9a-fA-F]{6}$")
+    scheme_type: str | None = Field(default=None, max_length=100)
+    institution: str | None = Field(default=None, max_length=200)
+    scheme_notes: str | None = Field(default=None, max_length=1000)
 
 
 class GoalUpdate(BaseModel):
@@ -185,14 +150,7 @@ class GoalUpdate(BaseModel):
 
 
 class GoalDeposit(BaseModel):
-    amount: float
-
-    @field_validator("amount")
-    @classmethod
-    def amount_positive(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("Amount must be positive")
-        return v
+    amount: float = Field(gt=0, le=100_000_000)
 
 
 class GoalOut(BaseModel):

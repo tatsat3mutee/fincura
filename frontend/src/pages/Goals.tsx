@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { useAppStore } from '../store/useAppStore'
 import GoalCard from '../components/GoalCard'
 import type { Goal } from '../types'
 import '../styles/goals.css'
@@ -39,6 +40,7 @@ const SCHEME_TIPS: Record<string, { returns: string; lock: string; tax: string; 
 
 export default function Goals() {
   const { user } = useAuth()
+  const addToast = useAppStore((s) => s.addToast)
   const currency = user?.currency ?? 'INR'
   const [goals, setGoals] = useState<Goal[]>([])
   const [showForm, setShowForm] = useState(false)
@@ -46,7 +48,6 @@ export default function Goals() {
   const [depositGoal, setDepositGoal] = useState<Goal | null>(null)
   const [depositAmt, setDepositAmt] = useState('')
   const [depositErr, setDepositErr] = useState('')
-  const [toast, setToast] = useState('')
   const [name, setName] = useState('')
   const [target, setTarget] = useState('')
   const [saved, setSaved] = useState('0')
@@ -123,8 +124,7 @@ export default function Goals() {
       setDepositGoal(null)
       setDepositAmt('')
       load()
-      setToast(`Deposited ₹${amt.toLocaleString()} — recorded as expense in Transactions`)
-      setTimeout(() => setToast(''), 4000)
+      addToast('success', `Deposited ₹${amt.toLocaleString()} — recorded as expense in Transactions`)
     } catch (err) {
       setDepositErr(err instanceof Error ? err.message : 'Failed to deposit')
     }
@@ -256,9 +256,6 @@ export default function Goals() {
             </form>
           </div>
         </div>
-      )}
-      {toast && (
-        <div className="goals-toast">{toast}</div>
       )}
     </div>
   )

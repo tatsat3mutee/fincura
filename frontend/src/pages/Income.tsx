@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { useAppStore } from '../store/useAppStore'
 import type { MonthlySummary, Transaction } from '../types'
-import { currentMonth, formatCurrency } from '../types'
+import { formatCurrency, currentMonth } from '../types'
 import '../styles/income.css'
 
 interface Bucket {
@@ -61,7 +62,8 @@ export default function Income() {
   const { user } = useAuth()
   const currency = user?.currency ?? 'INR'
   const uid = user?.id ?? 'guest'
-  const [month, setMonth] = useState(currentMonth())
+  const month = useAppStore((s) => s.selectedMonth)
+  const setMonth = useAppStore((s) => s.setSelectedMonth)
   const [summary, setSummary] = useState<MonthlySummary | null>(null)
   const [expenseTxns, setExpenseTxns] = useState<Transaction[]>([])
   const [incomeTxns, setIncomeTxns] = useState<Transaction[]>([])

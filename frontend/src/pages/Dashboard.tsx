@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { useAppStore } from '../store/useAppStore'
 import StatCard from '../components/StatCard'
 import MonthlyTrendChart from '../components/charts/MonthlyTrendChart'
 import CategoryDonutChart from '../components/charts/CategoryDonutChart'
@@ -8,7 +9,7 @@ import DailySpendChart from '../components/charts/DailySpendChart'
 import TransactionRow from '../components/TransactionRow'
 import TransactionForm from '../components/TransactionForm'
 import type { MonthlySummary, Transaction } from '../types'
-import { currentMonth, formatCurrency } from '../types'
+import { formatCurrency, currentMonth } from '../types'
 import '../styles/dashboard.css'
 
 function monthLabel(m: string) {
@@ -29,7 +30,8 @@ function nextMonth(m: string): string {
 export default function Dashboard() {
   const { user } = useAuth()
   const uid = user?.id ?? 'guest'
-  const [month, setMonth] = useState(currentMonth())
+  const month = useAppStore((s) => s.selectedMonth)
+  const setMonth = useAppStore((s) => s.setSelectedMonth)
   const [summary, setSummary] = useState<MonthlySummary | null>(null)
   const [recent, setRecent] = useState<Transaction[]>([])
   const [showForm, setShowForm] = useState(false)

@@ -4,6 +4,7 @@ export interface User {
   email: string
   currency: string
   created_at: string
+  email_verified: boolean
 }
 
 export interface Transaction {
@@ -20,6 +21,9 @@ export interface Transaction {
   category_name: string
   category_icon: string
   category_color: string
+  is_recurring: boolean
+  recurrence_rule: string | null
+  recurrence_end_date: string | null
 }
 
 export interface Category {

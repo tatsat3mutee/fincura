@@ -34,6 +34,9 @@ async def create_transaction(body: TransactionCreate, current_user=Depends(get_c
     txn_id = await db.create_transaction(
         current_user["id"], body.type, body.amount, body.category_id,
         body.note, body.txn_date, body.visibility,
+        is_recurring=body.is_recurring,
+        recurrence_rule=body.recurrence_rule,
+        recurrence_end_date=body.recurrence_end_date,
     )
     row = await db.get_transaction(current_user["id"], txn_id)
     return _row(row)

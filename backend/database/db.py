@@ -226,6 +226,23 @@ _SCHEMA_MIGRATIONS = [
     "INSERT INTO categories (user_id, name, icon, color, type, system_default, sort_order)"
     " SELECT NULL, 'Savings', '💰', '#2e7d52', 'expense', 1, 11"
     " WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Savings' AND system_default = 1)",
+    # Recurring transactions support
+    "ALTER TABLE transactions ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE transactions ADD COLUMN recurrence_rule TEXT",
+    "ALTER TABLE transactions ADD COLUMN recurrence_end_date TEXT",
+    (
+        "CREATE TABLE IF NOT EXISTS recurring_transaction_log ("
+        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  source_transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,"
+        "  generated_txn_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,"
+        "  generated_date TEXT NOT NULL"
+        ")"
+    ),
+    # Email verification — backfill existing accounts as verified before enforcing
+    "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN verification_token TEXT",
+    "ALTER TABLE users ADD COLUMN verification_token_expires TEXT",
+    "UPDATE users SET email_verified = 1 WHERE email IS NOT NULL",
 ]
 
 _SEED_CATEGORIES = [
@@ -319,6 +336,35 @@ async def get_user_by_id(user_id: int):
         return await cur.fetchone()
 
 
+async def set_verification_token(user_id: int, token: str, expires: str) -> None:
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE users SET verification_token = ?, verification_token_expires = ? WHERE id = ?",
+            (token, expires, user_id),
+        )
+        await db.commit()
+
+
+async def verify_email_token(token: str):
+    """Return user row if token is valid and not expired, else None."""
+    async with get_db() as db:
+        cur = await db.execute(
+            "SELECT * FROM users WHERE verification_token = ?"
+            " AND verification_token_expires > datetime('now')",
+            (token,),
+        )
+        user = await cur.fetchone()
+        if user:
+            await db.execute(
+                "UPDATE users SET email_verified = 1, verification_token = NULL,"
+                " verification_token_expires = NULL WHERE id = ?",
+                (user["id"],),
+            )
+            await db.commit()
+        return user
+
+
+
 async def get_user_by_google_id(google_id: str):
     async with get_db() as db:
         cur = await db.execute("SELECT * FROM users WHERE google_id = ?", (google_id,))
@@ -357,12 +403,17 @@ async def get_categories(user_id: int):
 async def create_transaction(
     user_id: int, txn_type: str, amount: float, category_id: int,
     note: str | None, txn_date: str, visibility: str = "personal",
+    is_recurring: bool = False, recurrence_rule: str | None = None,
+    recurrence_end_date: str | None = None,
 ) -> int:
     async with get_db() as db:
         cur = await db.execute(
-            "INSERT INTO transactions (user_id, type, amount, category_id, note, txn_date, visibility)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (user_id, txn_type, amount, category_id, note, txn_date, visibility),
+            "INSERT INTO transactions"
+            " (user_id, type, amount, category_id, note, txn_date, visibility,"
+            "  is_recurring, recurrence_rule, recurrence_end_date)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (user_id, txn_type, amount, category_id, note, txn_date, visibility,
+             int(is_recurring), recurrence_rule, recurrence_end_date),
         )
         await db.commit()
         return cur.lastrowid

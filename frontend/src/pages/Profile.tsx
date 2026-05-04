@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { api } from '../api/client'
+import { api, getAccessToken } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import type { User, UserStats } from '../types'
 import { formatCurrency } from '../types'
@@ -19,6 +19,8 @@ export default function Profile() {
   const [pwdOk, setPwdOk] = useState(false)
   const [savingPwd, setSavingPwd] = useState(false)
   const [stats, setStats] = useState<UserStats | null>(null)
+  const [verifyMsg, setVerifyMsg] = useState('')
+  const [resending, setResending] = useState(false)
 
   useEffect(() => {
     api.get<UserStats>('/profile/stats').then(setStats).catch(() => {})
@@ -30,8 +32,7 @@ export default function Profile() {
     setSavingProfile(true)
     try {
       const updated = await api.put<User>('/profile', { name, currency })
-      const token = localStorage.getItem('token') ?? ''
-      login(token, updated)
+      login(getAccessToken() ?? '', updated)
       setProfileOk(true)
     } catch (err) {
       setProfileErr(err instanceof Error ? err.message : 'Failed to save')
@@ -56,9 +57,31 @@ export default function Profile() {
     }
   }
 
+  async function handleResendVerification() {
+    setResending(true); setVerifyMsg('')
+    try {
+      const res = await api.post<{ message: string }>('/auth/resend-verification', {})
+      setVerifyMsg(res.message)
+    } catch (err) {
+      setVerifyMsg(err instanceof Error ? err.message : 'Failed to send')
+    } finally {
+      setResending(false)
+    }
+  }
+
   return (
     <div className="profile-page">
       <h1 className="page-title">Profile</h1>
+
+      {user && !user.email_verified && (
+        <div className="profile-verify-banner">
+          <span>⚠ Your email is not verified.</span>
+          <button className="btn-secondary" onClick={handleResendVerification} disabled={resending} style={{ marginLeft: '1rem', padding: '0.3rem 0.75rem', fontSize: '0.85rem' }}>
+            {resending ? 'Sending…' : 'Resend verification email'}
+          </button>
+          {verifyMsg && <span style={{ marginLeft: '0.75rem', fontSize: '0.85rem', color: 'var(--income)' }}>{verifyMsg}</span>}
+        </div>
+      )}
 
       {stats && (
         <div className="profile-stats">
@@ -125,6 +148,31 @@ export default function Profile() {
             {savingPwd ? 'Changing…' : 'Change password'}
           </button>
         </form>
+      </div>
+
+      <div className="profile-section">
+        <h2 className="profile-section-title">Export your data</h2>
+        <p className="profile-section-desc">Download all your transactions, budgets and goals as a JSON file.</p>
+        <button
+          className="btn-secondary"
+          onClick={async () => {
+            try {
+              const BASE = import.meta.env.VITE_API_URL ?? ''
+              const res = await fetch(`${BASE}/api/export/json`, {
+                headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` },
+                credentials: 'include',
+              })
+              if (!res.ok) return
+              const blob = await res.blob()
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url; a.download = 'fincura-export.json'; a.click()
+              URL.revokeObjectURL(url)
+            } catch { /* best-effort */ }
+          }}
+        >
+          ↓ Export all data (JSON)
+        </button>
       </div>
     </div>
   )

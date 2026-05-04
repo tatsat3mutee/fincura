@@ -8,6 +8,7 @@ const NAV = [
   { to: '/income',       label: 'Income',        icon: '↑' },
   { to: '/goals',        label: 'Goals',         icon: '◎' },
   { to: '/splits',       label: 'Splits',        icon: '⊕' },
+  { to: '/import',       label: 'Import',        icon: '⤵' },
   { to: '/calculators',  label: 'Calculators',   icon: '◧' },
   { to: '/household',    label: 'Household',     icon: '⌂' },
   { to: '/profile',      label: 'Profile',       icon: '◉' },

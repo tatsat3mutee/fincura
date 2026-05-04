@@ -15,7 +15,7 @@ export default function TransactionRow({ transaction: t, currency, onEdit, onDel
         {t.category_icon}
       </div>
       <div className="txn-row-info">
-        <span className="txn-row-note">{t.note || t.category_name}</span>
+        <span className="txn-row-note">{t.note || t.category_name}{t.is_recurring && <span className="txn-recurring-badge" title={`Repeats ${t.recurrence_rule}`}>↻</span>}</span>
         <span className="txn-row-meta">{t.category_name} · {t.txn_date}</span>
       </div>
       <div className={`txn-row-amount txn-row-amount--${t.type}`}>

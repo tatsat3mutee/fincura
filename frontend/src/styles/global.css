@@ -100,6 +100,41 @@ body {
   font-size: 0.9rem;
 }
 
+/* ── Toast notification system ────────────────────────────────────────────── */
+
+.toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 2000;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 0.75rem 1.25rem;
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  cursor: pointer;
+  pointer-events: all;
+  max-width: 340px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  animation: toast-in 0.2s ease;
+}
+
+.toast--success { background: var(--income);   color: #fff; }
+.toast--error   { background: var(--expense);  color: #fff; }
+.toast--info    { background: var(--accent);   color: #fff; }
+
+@keyframes toast-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
 /* ── Shared buttons ───────────────────────────────────────────────────────── */
 
 .btn-primary {
@@ -121,6 +156,24 @@ body {
 .btn-primary:hover:not(:disabled) { background: var(--color-primary-light); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-full { width: 100%; justify-content: center; }
+
+.btn-secondary {
+  padding: 0.55rem 1.125rem;
+  background: transparent;
+  color: var(--color-primary);
+  border: 1.5px solid var(--color-primary);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+.btn-secondary:hover:not(:disabled) { background: var(--color-primary); color: white; }
+.btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* ── Transaction list rows (used on Dashboard + Transactions) ─────────────── */
 
@@ -169,6 +222,15 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.txn-recurring-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-size: 0.7rem;
+  color: var(--accent);
+  vertical-align: middle;
+  opacity: 0.8;
 }
 
 .txn-row-meta {

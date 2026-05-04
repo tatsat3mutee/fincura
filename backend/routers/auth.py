@@ -5,13 +5,18 @@ from urllib.parse import urlencode
 
 import bcrypt
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from jose import JWTError, jwt
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from auth.jwt import ALGORITHM, SECRET_KEY, create_access_token, get_current_user
+from auth.jwt import (
+    ALGORITHM, SECRET_KEY,
+    create_access_token, create_refresh_token,
+    set_refresh_cookie, clear_auth_cookies,
+    get_current_user,
+)
 from database.db import (
     create_google_user,
     create_user,
@@ -19,6 +24,8 @@ from database.db import (
     get_user_by_google_id,
     get_user_by_id,
     link_google_account,
+    set_verification_token,
+    verify_email_token,
 )
 from schemas.models import TokenOut, UserLogin, UserOut, UserRegister
 
@@ -31,6 +38,8 @@ GOOGLE_REDIRECT_URI = os.environ.get(
     "GOOGLE_REDIRECT_URI", "http://localhost:8000/api/auth/google/callback"
 )
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+FROM_EMAIL = os.environ.get("FROM_EMAIL", "noreply@fincura.app")
 
 _GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 _GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -45,6 +54,33 @@ def _verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
+async def _send_verification_email(user_id: int, email: str, name: str) -> None:
+    """Send email verification link via Resend. Silently skips if RESEND_API_KEY not configured."""
+    if not RESEND_API_KEY:
+        return
+    token = secrets.token_urlsafe(32)
+    expires = (datetime.now(timezone.utc) + timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
+    await set_verification_token(user_id, token, expires)
+    verify_url = f"{FRONTEND_URL}/verify-email?token={token}"
+    try:
+        import resend  # noqa: PLC0415
+        resend.api_key = RESEND_API_KEY
+        resend.Emails.send({
+            "from": FROM_EMAIL,
+            "to": email,
+            "subject": "Verify your Fincura account",
+            "html": (
+                f"<p>Hi {name},</p>"
+                f"<p>Click the link below to verify your email address. "
+                f"This link expires in 24 hours.</p>"
+                f"<p><a href='{verify_url}'>Verify email</a></p>"
+                f"<p>If you didn't create a Fincura account, you can safely ignore this email.</p>"
+            ),
+        })
+    except Exception:
+        pass  # best-effort; user can request re-send
+
+
 def _user_out(row) -> UserOut:
     return UserOut(
         id=row["id"],
@@ -52,22 +88,25 @@ def _user_out(row) -> UserOut:
         email=row["email"],
         currency=row["currency"],
         created_at=row["created_at"],
+        email_verified=bool(row["email_verified"]),
     )
 
 
 @router.post("/register", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
 @_limiter.limit("10/minute")
-async def register(request: Request, body: UserRegister):
+async def register(request: Request, response: Response, body: UserRegister):
     if await get_user_by_email(body.email):
         raise HTTPException(status_code=409, detail="Email already registered")
     user_id = await create_user(body.name, body.email, _hash_password(body.password))
     user = await get_user_by_id(user_id)
+    await _send_verification_email(user_id, body.email, body.name)
+    set_refresh_cookie(response, user_id)
     return TokenOut(access_token=create_access_token(user_id), user=_user_out(user))
 
 
 @router.post("/login", response_model=TokenOut)
 @_limiter.limit("20/minute")
-async def login(request: Request, body: UserLogin):
+async def login(request: Request, response: Response, body: UserLogin):
     user = await get_user_by_email(body.email)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -77,12 +116,65 @@ async def login(request: Request, body: UserLogin):
         )
     if not _verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    set_refresh_cookie(response, user["id"])
     return TokenOut(access_token=create_access_token(user["id"]), user=_user_out(user))
 
 
 @router.get("/me", response_model=UserOut)
 async def me(current_user=Depends(get_current_user)):
     return _user_out(current_user)
+
+
+@router.post("/refresh")
+async def refresh_token(request: Request, response: Response):
+    """
+    Browser sends the httpOnly refresh cookie automatically to this path.
+    Returns a new short-lived access token in the response body.
+    Also rotates the refresh cookie.
+    """
+    token = request.cookies.get("refresh_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="No refresh token")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        user_id = int(payload["sub"])
+    except (JWTError, KeyError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    user = await get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    # Rotate: issue new refresh cookie + new access token
+    set_refresh_cookie(response, user_id)
+    return TokenOut(access_token=create_access_token(user_id), user=_user_out(user))
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    clear_auth_cookies(response)
+    return {"message": "Logged out"}
+
+
+@router.post("/verify-email")
+async def verify_email(token: str):
+    """Consume a verification token and mark the account as verified."""
+    user = await verify_email_token(token)
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+    return {"message": "Email verified"}
+
+
+@router.post("/resend-verification")
+@_limiter.limit("3/minute")
+async def resend_verification(request: Request, current_user=Depends(get_current_user)):
+    """Re-send verification email to the logged-in user if not yet verified."""
+    if current_user["email_verified"]:
+        return {"message": "Already verified"}
+    await _send_verification_email(current_user["id"], current_user["email"], current_user["name"])
+    return {"message": "Verification email sent"}
 
 
 # ── Google OAuth ──────────────────────────────────────────────────────────────
@@ -153,5 +245,9 @@ async def google_callback(code: str, state: str | None = None, error: str | None
             uid = await create_google_user(name, email, google_id)
             user = await get_user_by_id(uid)
 
-    token = create_access_token(user["id"])
-    return RedirectResponse(f"{FRONTEND_URL}/oauth-callback?token={token}")
+    # Access token in URL param (15 min — short enough to be safe in transit)
+    # Refresh cookie is set so the frontend can silently renew access tokens
+    access_token = create_access_token(user["id"])
+    redirect = RedirectResponse(f"{FRONTEND_URL}/oauth-callback?token={access_token}")
+    set_refresh_cookie(redirect, user["id"])
+    return redirect

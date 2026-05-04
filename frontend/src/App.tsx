@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { pingBackend } from './api/client'
 import Sidebar from './components/Sidebar'
+import { ToastContainer } from './components/ToastContainer'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -14,6 +15,8 @@ import Profile from './pages/Profile'
 import Calculators from './pages/Calculators'
 import Splits from './pages/Splits'
 import Income from './pages/Income'
+import Import from './pages/Import'
+import VerifyEmail from './pages/VerifyEmail'
 import './styles/layout.css'
 
 function AppLayout({ children }: { children: ReactNode }) {
@@ -86,6 +89,7 @@ export default function App() {
     <BrowserRouter>
       <WakeUpBanner />
       <AuthProvider>
+        <ToastContainer />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -99,6 +103,8 @@ export default function App() {
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           <Route path="/calculators" element={<PrivateRoute><Calculators /></PrivateRoute>} />
           <Route path="/splits" element={<PrivateRoute><Splits /></PrivateRoute>} />
+          <Route path="/import" element={<PrivateRoute><Import /></PrivateRoute>} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>

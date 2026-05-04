@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { useAppStore } from '../store/useAppStore'
 import TransactionRow from '../components/TransactionRow'
 import TransactionForm from '../components/TransactionForm'
 import BudgetBar from '../components/BudgetBar'
 import type { Transaction, Budget, Category } from '../types'
-import { currentMonth, formatCurrency } from '../types'
+import { formatCurrency } from '../types'
 import '../styles/transactions.css'
 import '../styles/budgets.css'
 
@@ -23,7 +24,8 @@ export default function Transactions() {
   const { user } = useAuth()
   const currency = user?.currency ?? 'INR'
   const [activeTab, setActiveTab] = useState<'transactions' | 'budgets'>('transactions')
-  const [month, setMonth] = useState(currentMonth())
+  const month = useAppStore((s) => s.selectedMonth)
+  const setMonth = useAppStore((s) => s.setSelectedMonth)
 
   // — Transaction state —
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -173,10 +175,54 @@ export default function Transactions() {
         <div>
           <h1 className="page-title">{activeTab === 'budgets' ? 'Budgets' : 'Transactions'}</h1>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <input type="month" value={month} onChange={e => setMonth(e.target.value)} className="filter-input" />
           {activeTab === 'transactions' && (
-            <button className="btn-primary" onClick={() => { setEditing(null); setShowForm(true) }}>+ Add</button>
+              <>
+              <button
+                className="btn-secondary"
+                onClick={async () => {
+                  try {
+                    const BASE = import.meta.env.VITE_API_URL ?? ''
+                    const { getAccessToken } = await import('../api/client')
+                    const res = await fetch(
+                      `${BASE}/api/export/csv?year=${month.slice(0, 4)}`,
+                      { headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` }, credentials: 'include' }
+                    )
+                    if (!res.ok) return
+                    const blob = await res.blob()
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url; a.download = `fincura-${month.slice(0, 4)}.csv`; a.click()
+                    URL.revokeObjectURL(url)
+                  } catch { /* best-effort */ }
+                }}
+              >
+                ↓ CSV
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={async () => {
+                  try {
+                    const BASE = import.meta.env.VITE_API_URL ?? ''
+                    const { getAccessToken } = await import('../api/client')
+                    const res = await fetch(
+                      `${BASE}/api/export/pdf/${month}`,
+                      { headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` }, credentials: 'include' }
+                    )
+                    if (!res.ok) return
+                    const blob = await res.blob()
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url; a.download = `fincura-${month}.pdf`; a.click()
+                    URL.revokeObjectURL(url)
+                  } catch { /* best-effort */ }
+                }}
+              >
+                ↓ PDF
+              </button>
+              <button className="btn-primary" onClick={() => { setEditing(null); setShowForm(true) }}>+ Add</button>
+            </>
           )}
           {activeTab === 'budgets' && (
             <button className="btn-primary" onClick={openAddBudget}>+ Add budget</button>

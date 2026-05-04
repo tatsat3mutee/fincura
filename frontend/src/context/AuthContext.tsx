@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { api } from '../api/client'
+import { api, setAccessToken, attemptTokenRefresh } from '../api/client'
 
 export interface User {
   id: number
@@ -7,13 +7,14 @@ export interface User {
   email: string
   currency: string
   created_at: string
+  email_verified: boolean
 }
 
 interface AuthState {
   user: User | null
   loading: boolean
-  login: (token: string, user: User) => void
-  logout: () => void
+  login: (accessToken: string, user: User) => void
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -23,24 +24,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      setLoading(false)
-      return
-    }
-    api.get<User>('/auth/me')
-      .then(setUser)
-      .catch(() => localStorage.removeItem('token'))
+    // On mount: try to get a fresh access token via the httpOnly refresh cookie.
+    // No localStorage reads — the cookie is sent automatically by the browser.
+    attemptTokenRefresh()
+      .then(async (ok) => {
+        if (ok) {
+          const me = await api.get<User>('/auth/me').catch(() => null)
+          setUser(me)
+        }
+      })
       .finally(() => setLoading(false))
   }, [])
 
-  function login(token: string, user: User) {
-    localStorage.setItem('token', token)
-    setUser(user)
+  function login(accessToken: string, newUser: User) {
+    setAccessToken(accessToken)
+    setUser(newUser)
   }
 
-  function logout() {
-    localStorage.removeItem('token')
+  async function logout() {
+    try {
+      await api.post('/auth/logout', {})
+    } catch {
+      // ignore — clear local state regardless
+    }
+    setAccessToken(null)
     setUser(null)
   }
 
@@ -56,3 +63,4 @@ export function useAuth(): AuthState {
   if (!ctx) throw new Error('useAuth must be used inside AuthProvider')
   return ctx
 }
+

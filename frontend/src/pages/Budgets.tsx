@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { api } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { useAppStore } from '../store/useAppStore'
 import BudgetBar from '../components/BudgetBar'
 import type { Budget, Category } from '../types'
-import { currentMonth } from '../types'
 import '../styles/budgets.css'
 
 const PERIOD_OPTIONS = [
@@ -19,7 +19,8 @@ interface Toast { id: number; msg: string; level: 'warn' | 'danger' }
 export default function Budgets() {
   const { user } = useAuth()
   const currency = user?.currency ?? 'INR'
-  const [month, setMonth] = useState(currentMonth())
+  const month = useAppStore((s) => s.selectedMonth)
+  const setMonth = useAppStore((s) => s.setSelectedMonth)
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [showForm, setShowForm] = useState(false)

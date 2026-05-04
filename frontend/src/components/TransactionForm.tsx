@@ -17,6 +17,9 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
   const [categoryId, setCategoryId] = useState<number | ''>(transaction?.category_id ?? '')
   const [note, setNote] = useState(transaction?.note ?? '')
   const [txnDate, setTxnDate] = useState(transaction?.txn_date ?? todayISO())
+  const [isRecurring, setIsRecurring] = useState(transaction?.is_recurring ?? false)
+  const [recurrenceRule, setRecurrenceRule] = useState(transaction?.recurrence_rule ?? 'monthly')
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState(transaction?.recurrence_end_date ?? '')
   const [categories, setCategories] = useState<Category[]>([])
   const [catsLoading, setCatsLoading] = useState(true)
   const [catsError, setCatsError] = useState('')
@@ -69,7 +72,12 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
     if (isOther && !note.trim()) { setError('Please describe what "Other" is'); return }
     const finalAmount = parseFloat(amount)
     if (!finalAmount || finalAmount <= 0) { setError('Enter a valid amount'); return }
-    const body = { type, amount: finalAmount, category_id: categoryId, note: note || null, txn_date: txnDate }
+    const body = {
+      type, amount: finalAmount, category_id: categoryId, note: note || null, txn_date: txnDate,
+      is_recurring: isRecurring,
+      recurrence_rule: isRecurring ? recurrenceRule : null,
+      recurrence_end_date: isRecurring && recurrenceEndDate ? recurrenceEndDate : null,
+    }
     setLoading(true)
     try {
       if (editing && transaction) {
@@ -232,6 +240,39 @@ export default function TransactionForm({ transaction, onClose, onSuccess }: Pro
               required
             />
           </label>
+
+          <div className="form-label">
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={isRecurring}
+                onChange={e => setIsRecurring(e.target.checked)}
+              />
+              Recurring transaction
+            </label>
+            {isRecurring && (
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                <label className="form-label" style={{ flex: 1, minWidth: 140 }}>
+                  Repeats
+                  <select value={recurrenceRule} onChange={e => setRecurrenceRule(e.target.value)} className="form-input">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </label>
+                <label className="form-label" style={{ flex: 1, minWidth: 140 }}>
+                  End date <span className="form-hint">(optional)</span>
+                  <input
+                    type="date"
+                    value={recurrenceEndDate}
+                    onChange={e => setRecurrenceEndDate(e.target.value)}
+                    className="form-input"
+                  />
+                </label>
+              </div>
+            )}
+          </div>
 
           {error && <p className="form-error">{error}</p>}
 

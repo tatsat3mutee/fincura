@@ -4,17 +4,20 @@ services:
     name: fincura-api
     runtime: python
     region: singapore
-    plan: free
+    plan: starter
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: gunicorn main:app -w 2 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --max-requests 1000 --max-requests-jitter 100 --timeout 30 --graceful-timeout 10
+    healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
-        sync: false
+        sync: false   # Paste your Neon connection string in the Render dashboard
       - key: SECRET_KEY
         generateValue: true
+      - key: ENV
+        value: production
       - key: ALLOWED_ORIGINS
-        value: https://fincura.onrender.com
+        value: https://fincura.vercel.app
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
@@ -22,9 +25,15 @@ services:
       - key: GOOGLE_REDIRECT_URI
         value: https://fincura-api.onrender.com/api/auth/google/callback
       - key: FRONTEND_URL
-        value: https://fincura.onrender.com
+        value: https://fincura.vercel.app
+      - key: SENTRY_DSN
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: FROM_EMAIL
+        value: noreply@fincura.app
 
-  # ── Frontend ───────────────────────────────────────────────────────────────
+  # ── Frontend (keep as Render static until Vercel migration) ───────────────
   - type: web
     name: fincura
     runtime: static
@@ -34,6 +43,8 @@ services:
     envVars:
       - key: VITE_API_URL
         value: https://fincura-api.onrender.com
+      - key: VITE_SENTRY_DSN
+        sync: false
     headers:
       - path: /*
         name: Cache-Control
