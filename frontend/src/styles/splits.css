@@ -226,11 +226,14 @@
   align-items: center;
   gap: 0.5rem;
 }
+.splits-person-row > * { min-width: 0; }
 
 .splits-amount-wrap {
   position: relative;
   display: flex;
   align-items: center;
+  min-width: 0;
+  width: 100%;
 }
 .splits-currency {
   position: absolute;
@@ -242,6 +245,7 @@
 }
 .splits-amount-wrap .form-input {
   padding-left: 1.4rem;
+  width: 100%;
 }
 
 .splits-my-share {
