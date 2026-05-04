@@ -20,6 +20,10 @@
   overflow-y: auto;
 }
 
+.modal-card--wide {
+  max-width: 560px;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
