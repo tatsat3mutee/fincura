@@ -13,13 +13,13 @@ The existing `app.py` / `templates/` / `static/` Flask skeleton is superseded by
 ## Running the project
 
 ```bash
-# Backend — from repo root
+# Backend (from repo root)
 cd backend
 pip install -r requirements.txt
 uvicorn main:app --reload
 # API: http://localhost:8000   Docs: http://localhost:8000/docs
 
-# Frontend — from repo root
+# Frontend (from repo root)
 cd frontend
 npm install
 npm run dev
@@ -36,23 +36,23 @@ cd frontend && npx tsc --noEmit
 
 ### Backend (`backend/`)
 
-**Entry point:** `main.py` — FastAPI app, CORS (origin `http://localhost:5173`), lifespan startup that calls `init_db()` + `seed_db()`.
+**Entry point:** `main.py`: FastAPI app, CORS (origin `http://localhost:5173`), lifespan startup that calls `init_db()` + `seed_db()`.
 
-**All SQL lives in `database/db.py`.** Routers call db functions; they never build SQL strings themselves. Every function is `async` and uses `aiosqlite`. All queries use `?` placeholders — no f-strings in SQL ever.
+**All SQL lives in `database/db.py`.** Routers call db functions; they never build SQL strings themselves. Every function is `async` and uses `aiosqlite`. All queries use `?` placeholders: no f-strings in SQL ever.
 
 **Routers** (`routers/`) are thin: validate via Pydantic (FastAPI does this automatically from `schemas/models.py`), call `database/db.py`, return the result. No business logic in routers beyond HTTP concerns.
 
-**Auth** (`auth/jwt.py`) exposes a single FastAPI dependency `get_current_user`. Every protected route declares `current_user: dict = Depends(get_current_user)`. The `user_id` from this dict must be passed to every db function that touches user-owned data — never trust an id from the URL alone.
+**Auth** (`auth/jwt.py`) exposes a single FastAPI dependency `get_current_user`. Every protected route declares `current_user: dict = Depends(get_current_user)`. The `user_id` from this dict must be passed to every db function that touches user-owned data: never trust an id from the URL alone.
 
 **Pydantic models** (`schemas/models.py`) cover all request bodies and response shapes. Use `model_config = ConfigDict(from_attributes=True)` so they work with `aiosqlite.Row` objects.
 
 ### Frontend (`frontend/src/`)
 
-**API calls** go through `api/client.ts` exclusively — it attaches the JWT from `localStorage` and handles 401 redirects. Never call `fetch` directly from components.
+**API calls** go through `api/client.ts` exclusively: it attaches the JWT from `localStorage` and handles 401 redirects. Never call `fetch` directly from components.
 
 **Auth state** lives in `context/AuthContext.tsx`. Components use `useAuth()` to get the current user or call `login()`/`logout()`. Route protection is handled by `PrivateRoute` in `App.tsx`.
 
-**Pages** (`pages/`) are responsible for data fetching and layout. **Components** (`components/`) are pure UI — they receive props, emit callbacks.
+**Pages** (`pages/`) are responsible for data fetching and layout. **Components** (`components/`) are pure UI: they receive props, emit callbacks.
 
 **Charts** use Recharts. The three chart components in `components/charts/` each fetch their own data from `/api/charts/*` endpoints.
 

@@ -5,6 +5,7 @@ import { pingBackend } from './api/client'
 import Sidebar from './components/Sidebar'
 import { ToastContainer } from './components/ToastContainer'
 import InstallBanner from './components/InstallBanner'
+import Landing from './pages/Landing'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -93,6 +94,7 @@ export default function App() {
       <AuthProvider>
         <ToastContainer />
         <Routes>
+          <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/oauth-callback" element={<OAuthCallback />} />

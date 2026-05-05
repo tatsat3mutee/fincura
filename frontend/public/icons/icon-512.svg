@@ -1,4 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <rect width="512" height="512" rx="100" fill="#1a472a"/>
-  <text x="256" y="350" font-size="280" text-anchor="middle" font-family="Georgia, serif" fill="white">F</text>
+  <!-- Full-bleed background (maskable — OS applies the mask shape) -->
+  <rect width="512" height="512" fill="#1a472a"/>
+  <!-- White coin — kept in the inner 80% safe zone -->
+  <circle cx="256" cy="256" r="154" fill="white"/>
+  <!-- Ascending bar chart (3 bars, bottom-aligned at y=325) -->
+  <!-- Bar 1: shortest -->
+  <rect x="170" y="261" width="43" height="64" rx="11" fill="#1a472a"/>
+  <!-- Bar 2: medium -->
+  <rect x="235" y="221" width="43" height="104" rx="11" fill="#1a472a"/>
+  <!-- Bar 3: tallest -->
+  <rect x="299" y="176" width="43" height="149" rx="11" fill="#2e7d52"/>
+  <!-- Arrow tip above bar 3 -->
+  <polygon points="320,154 333,180 307,180" fill="#1a472a"/>
 </svg>

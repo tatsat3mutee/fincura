@@ -15,6 +15,10 @@ class UserLogin(BaseModel):
     password: str
 
 
+class ResendVerificationBody(BaseModel):
+    email: EmailStr
+
+
 class UserOut(BaseModel):
     id: int
     name: str

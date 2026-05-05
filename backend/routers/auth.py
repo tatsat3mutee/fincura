@@ -30,7 +30,7 @@ from database.db import (
     set_verification_token,
     verify_email_token,
 )
-from schemas.models import TokenOut, UserLogin, UserOut, UserRegister
+from schemas.models import TokenOut, UserLogin, UserOut, UserRegister, ResendVerificationBody
 
 router = APIRouter()
 _limiter = Limiter(key_func=get_remote_address)
@@ -180,6 +180,22 @@ async def resend_verification(request: Request, current_user=Depends(get_current
         return {"message": "Already verified"}
     await _send_verification_email(current_user["id"], current_user["email"], current_user["name"])
     return {"message": "Verification email sent"}
+
+
+@router.post("/resend-verification-public")
+@_limiter.limit("3/minute")
+async def resend_verification_public(request: Request, body: ResendVerificationBody):
+    """Re-send verification email by email address — no login required.
+
+    Always returns the same message regardless of whether the email exists,
+    to avoid leaking account information.
+    """
+    _GENERIC = {"message": "If that email has an unverified account, a new link has been sent."}
+    user = await get_user_by_email(body.email)
+    if not user or user["email_verified"]:
+        return _GENERIC
+    await _send_verification_email(user["id"], user["email"], user["name"])
+    return _GENERIC
 
 
 # ── Google OAuth ──────────────────────────────────────────────────────────────

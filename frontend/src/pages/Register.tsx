@@ -17,6 +17,7 @@ export default function Register() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [registered, setRegistered] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -25,7 +26,7 @@ export default function Register() {
     try {
       const res = await api.post<RegisterResponse>('/auth/register', { name, email, password })
       login(res.access_token, res.user)
-      navigate('/dashboard')
+      setRegistered(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
@@ -34,6 +35,37 @@ export default function Register() {
   }
 
   const GOOGLE_URL = `${import.meta.env.VITE_API_URL ?? ''}/api/auth/google`
+
+  if (registered) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <div style={{ textAlign: 'center', marginBottom: '1.25rem', fontSize: '2.5rem' }}>📬</div>
+          <h1 className="auth-title" style={{ marginBottom: '0.5rem' }}>Check your inbox</h1>
+          <p className="auth-heading" style={{ marginBottom: '1.5rem' }}>
+            We sent a verification link to<br />
+            <strong style={{ color: 'var(--color-text)' }}>{email}</strong>
+          </p>
+          <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)', textAlign: 'center', marginBottom: '1.75rem', lineHeight: 1.6 }}>
+            Click the link in the email to verify your account. The link expires in 24 hours.
+            You can still use Fincura while unverified.
+          </p>
+          <button
+            className="btn-primary btn-full"
+            onClick={() => navigate('/dashboard')}
+          >
+            Go to Dashboard
+          </button>
+          <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.82rem', color: 'var(--color-muted)' }}>
+            Didn't get it?{' '}
+            <Link to={`/verify-email?resend=1&email=${encodeURIComponent(email)}`} style={{ color: 'var(--color-primary)' }}>
+              Resend email
+            </Link>
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="auth-page">
@@ -55,15 +87,15 @@ export default function Register() {
 
         <form onSubmit={handleSubmit} className="auth-form">
           <label>
-            Name
+            <span>Name</span>
             <input type="text" value={name} onChange={e => setName(e.target.value)} required autoFocus />
           </label>
           <label>
-            Email
+            <span>Email</span>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
           </label>
           <label>
-            Password <span className="auth-hint">(min. 8 characters)</span>
+            <span>Password <span className="auth-hint">(min. 8 characters)</span></span>
             <input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={8} required />
           </label>
           {error && <p className="auth-error">{error}</p>}
