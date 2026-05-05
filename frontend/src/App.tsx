@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { pingBackend } from './api/client'
 import Sidebar from './components/Sidebar'
 import { ToastContainer } from './components/ToastContainer'
+import InstallBanner from './components/InstallBanner'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -88,6 +89,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <WakeUpBanner />
+      <InstallBanner />
       <AuthProvider>
         <ToastContainer />
         <Routes>

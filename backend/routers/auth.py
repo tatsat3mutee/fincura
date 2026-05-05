@@ -1,3 +1,4 @@
+import logging
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -7,6 +8,8 @@ import bcrypt
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
+
+logger = logging.getLogger(__name__)
 from jose import JWTError, jwt
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -57,6 +60,7 @@ def _verify_password(plain: str, hashed: str) -> bool:
 async def _send_verification_email(user_id: int, email: str, name: str) -> None:
     """Send email verification link via Resend. Silently skips if RESEND_API_KEY not configured."""
     if not RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY not set — skipping verification email for user %s", user_id)
         return
     token = secrets.token_urlsafe(32)
     expires = (datetime.now(timezone.utc) + timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
@@ -65,7 +69,7 @@ async def _send_verification_email(user_id: int, email: str, name: str) -> None:
     try:
         import resend  # noqa: PLC0415
         resend.api_key = RESEND_API_KEY
-        resend.Emails.send({
+        result = resend.Emails.send({
             "from": FROM_EMAIL,
             "to": email,
             "subject": "Verify your Fincura account",
@@ -77,8 +81,9 @@ async def _send_verification_email(user_id: int, email: str, name: str) -> None:
                 f"<p>If you didn't create a Fincura account, you can safely ignore this email.</p>"
             ),
         })
-    except Exception:
-        pass  # best-effort; user can request re-send
+        logger.info("Verification email sent to %s — id: %s", email, getattr(result, "id", result))
+    except Exception as exc:
+        logger.error("Failed to send verification email to %s: %s", email, exc)
 
 
 def _user_out(row) -> UserOut:
