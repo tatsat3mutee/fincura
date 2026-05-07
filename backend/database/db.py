@@ -207,6 +207,13 @@ CREATE TABLE IF NOT EXISTS split_members (
     share_amount REAL    NOT NULL,
     paid         INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS referral_codes (
+    id         INTEGER PRIMARY KEY,
+    user_id    INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    code       TEXT    NOT NULL UNIQUE,
+    created_at TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 # PostgreSQL: SERIAL PKs + now()::text defaults
@@ -243,6 +250,16 @@ _SCHEMA_MIGRATIONS = [
     "ALTER TABLE users ADD COLUMN verification_token TEXT",
     "ALTER TABLE users ADD COLUMN verification_token_expires TEXT",
     "UPDATE users SET email_verified = 1 WHERE email IS NOT NULL",
+    # Referral system
+    "ALTER TABLE users ADD COLUMN referred_by TEXT",
+    (
+        "CREATE TABLE IF NOT EXISTS referral_codes ("
+        "  id INTEGER PRIMARY KEY,"
+        "  user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,"
+        "  code TEXT NOT NULL UNIQUE,"
+        "  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
+        ")"
+    ),
 ]
 
 _SEED_CATEGORIES = [
@@ -346,7 +363,6 @@ async def set_verification_token(user_id: int, token: str, expires: str) -> None
 
 
 async def verify_email_token(token: str):
-    """Return user row if token is valid and not expired, else None."""
     async with get_db() as db:
         cur = await db.execute(
             "SELECT * FROM users WHERE verification_token = ?"
@@ -362,7 +378,6 @@ async def verify_email_token(token: str):
             )
             await db.commit()
         return user
-
 
 
 async def get_user_by_google_id(google_id: str):
@@ -564,7 +579,6 @@ async def get_daily_spend(user_id: int, month: str):
 # ── Budget queries ────────────────────────────────────────────────────────────
 
 async def get_budgets(user_id: int, month: str):
-    # 1. Fetch budget rows (no SQLite-specific date arithmetic)
     async with get_db() as db:
         cur = await db.execute(
             "SELECT b.id, b.category_id, b.month, b.amount as limit_amount,"
@@ -577,7 +591,6 @@ async def get_budgets(user_id: int, month: str):
         )
         budget_rows = await cur.fetchall()
 
-    # 2. Compute spent per budget using Python date arithmetic
     results = []
     for b in budget_rows:
         period = int(b["period_months"] or 1)
@@ -721,7 +734,6 @@ async def deposit_to_goal(user_id: int, goal_id: int, amount: float) -> bool:
             " WHERE id=? AND user_id=?",
             (new_saved, new_status, goal_id, user_id),
         )
-        # Find the Savings system category
         cur = await db.execute(
             "SELECT id FROM categories WHERE name = 'Savings' AND system_default = 1 LIMIT 1"
         )
@@ -911,7 +923,6 @@ async def delete_split(user_id: int, split_id: int) -> bool:
 
 async def toggle_split_member_paid(user_id: int, split_id: int, member_id: int) -> bool:
     async with get_db() as db:
-        # Verify ownership
         cur = await db.execute(
             "SELECT id FROM splits WHERE id = ? AND user_id = ?", (split_id, user_id)
         )
@@ -924,4 +935,3 @@ async def toggle_split_member_paid(user_id: int, split_id: int, member_id: int) 
         )
         await db.commit()
         return True
-
