@@ -19,9 +19,9 @@ const FEATURES = [
     desc: 'Create goals, deposit progress, watch the bar fill. Vacation fund, laptop, emergency cushion.',
   },
   {
-    icon: '👨‍👩‍👧',
-    name: 'Share with family',
-    desc: 'Create a household, invite your partner or family. Shared transactions visible to everyone.',
+    icon: '🤝',
+    name: 'Share with anyone',
+    desc: 'Create a household, invite others. Shared transactions, split bills, one view of group finances.',
   },
 ]
 
@@ -51,7 +51,7 @@ export default function Landing() {
         </h1>
         <p className="landing-subtext">
           Track income, expenses, and savings in one place. Set budgets, reach goals,
-          and share finances with your partner or family, without the spreadsheet headache.
+          and share finances with anyone you live or spend with — without the spreadsheet headache.
         </p>
         <div className="landing-ctas">
           <Link to="/register" className="landing-cta-primary">
@@ -105,8 +105,8 @@ export default function Landing() {
       <section className="landing-who">
         <h2 className="landing-who-title">Built for real life</h2>
         <p className="landing-who-sub">
-          Whether you're tracking solo, splitting costs with a partner,
-          or managing a family budget. Fincura adapts to how you actually live.
+          Whether you're tracking solo, splitting costs with roommates,
+          managing a family budget, or planning with a partner — Fincura fits.
         </p>
         <div className="landing-who-pills">
           <span className="landing-who-pill">Individuals</span>

@@ -12,6 +12,22 @@ import type { MonthlySummary, Transaction } from '../types'
 import { formatCurrency, currentMonth } from '../types'
 import '../styles/dashboard.css'
 
+interface MonthProjection {
+  spent_so_far: number
+  day_of_month: number
+  days_in_month: number
+  daily_rate: number
+  projected_month_total: number
+}
+
+interface Anomaly {
+  category: string
+  icon: string
+  avg_3m: number
+  current_month: number
+  ratio: number
+}
+
 function monthLabel(m: string) {
   const [y, mo] = m.split('-')
   return new Date(+y, +mo - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
@@ -37,14 +53,22 @@ export default function Dashboard() {
   const [showForm, setShowForm] = useState(false)
   const [chartKey, setChartKey] = useState(0)
   const [plannedIncome, setPlannedIncome] = useState<number | null>(null)
+  const [monthProjection, setMonthProjection] = useState<MonthProjection | null>(null)
+  const [anomalies, setAnomalies] = useState<Anomaly[]>([])
 
   function load() {
     api.get<MonthlySummary>(`/charts/summary?month=${month}`).then(setSummary)
     api.get<Transaction[]>(`/transactions?month=${month}&limit=5`).then(setRecent)
     setChartKey(k => k + 1)
-    // Read planned income set in Income page
     const stored = localStorage.getItem(`fincura_income_${uid}_${month}`)
     setPlannedIncome(stored ? parseFloat(stored) || null : null)
+    if (month === currentMonth()) {
+      api.get<MonthProjection>('/insights/month-projection').then(setMonthProjection).catch(() => {})
+      api.get<Anomaly[]>('/insights/anomalies').then(setAnomalies).catch(() => {})
+    } else {
+      setMonthProjection(null)
+      setAnomalies([])
+    }
   }
 
   async function handleDelete(id: number) {
@@ -58,7 +82,6 @@ export default function Dashboard() {
   const currency = user?.currency ?? 'INR'
   const expense = summary?.expense ?? 0
   const income = summary?.income ?? 0
-  // Use planned budget if set, otherwise fall back to actual income
   const budget = plannedIncome ?? income
   const budgetUsed = budget > 0 ? Math.min((expense / budget) * 100, 100) : 0
   const budgetRemaining = budget - expense
@@ -99,7 +122,6 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Budget progress bar — shown when planned income is set */}
       {plannedIncome !== null && budget > 0 && (
         <div className="dash-budget-bar-wrap">
           <div className="dash-budget-bar-bg">
@@ -132,6 +154,56 @@ export default function Dashboard() {
         <h3 className="chart-title">Daily Spending — {monthLabel(month)}</h3>
         <DailySpendChart month={month} currency={currency} refreshKey={chartKey} />
       </div>
+
+      {(monthProjection !== null || anomalies.length > 0) && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <h3 className="section-title" style={{ marginBottom: '0.75rem' }}>Insights</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+            {monthProjection && (
+              <div style={{
+                flex: '1 1 220px',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '10px',
+                padding: '1rem 1.25rem',
+              }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.35rem' }}>
+                  Month Projection
+                </div>
+                <div style={{
+                  fontSize: '1.5rem',
+                  fontWeight: 700,
+                  color: budget > 0 && monthProjection.projected_month_total > budget ? 'var(--expense)' : 'var(--text)',
+                }}>
+                  {formatCurrency(monthProjection.projected_month_total, currency)}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                  ₹{monthProjection.daily_rate.toLocaleString('en-IN')}/day · day {monthProjection.day_of_month} of {monthProjection.days_in_month}
+                </div>
+              </div>
+            )}
+            {anomalies.length > 0 && (
+              <div style={{
+                flex: '1 1 220px',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '10px',
+                padding: '1rem 1.25rem',
+              }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem' }}>
+                  Spending Alerts
+                </div>
+                {anomalies.slice(0, 3).map(a => (
+                  <div key={a.category} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.2rem 0' }}>
+                    <span style={{ fontSize: '0.85rem' }}>{a.icon} {a.category}</span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--expense)', fontWeight: 600 }}>{a.ratio}× avg</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="recent-section">
         <div className="recent-header">

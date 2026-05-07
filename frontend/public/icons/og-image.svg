@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0f1f14"/>
+  <line x1="0" y1="315" x2="1200" y2="315" stroke="#1a2e1f" stroke-width="1"/>
+  <text x="600" y="268"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="80" text-anchor="middle" fill="#ffffff" font-weight="400">
+    Fincura
+  </text>
+  <text x="600" y="316"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="18" fill="#4a7d5a" text-anchor="middle" letter-spacing="3">
+    PERSONAL FINANCE TRACKER
+  </text>
+  <rect x="258" y="352" width="110" height="26" rx="5" fill="#1a2e1f"/>
+  <text x="313" y="370" font-family="Arial, sans-serif" font-size="12" fill="#5a9e6a" text-anchor="middle">Track Expenses</text>
+  <rect x="380" y="352" width="96" height="26" rx="5" fill="#1a2e1f"/>
+  <text x="428" y="370" font-family="Arial, sans-serif" font-size="12" fill="#5a9e6a" text-anchor="middle">Set Budgets</text>
+  <rect x="488" y="352" width="110" height="26" rx="5" fill="#1a2e1f"/>
+  <text x="543" y="370" font-family="Arial, sans-serif" font-size="12" fill="#5a9e6a" text-anchor="middle">Savings Goals</text>
+  <rect x="610" y="352" width="96" height="26" rx="5" fill="#1a2e1f"/>
+  <text x="658" y="370" font-family="Arial, sans-serif" font-size="12" fill="#5a9e6a" text-anchor="middle">Bill Splits</text>
+  <rect x="718" y="352" width="96" height="26" rx="5" fill="#1a2e1f"/>
+  <text x="766" y="370" font-family="Arial, sans-serif" font-size="12" fill="#5a9e6a" text-anchor="middle">Household</text>
+  <rect x="826" y="352" width="116" height="26" rx="5" fill="#1a2e1f"/>
+  <text x="884" y="370" font-family="Arial, sans-serif" font-size="12" fill="#5a9e6a" text-anchor="middle">Refer &amp; Earn</text>
+  <rect x="540" y="406" width="120" height="3" rx="1.5" fill="#2e7d52"/>
+  <text x="600" y="480"
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="14" fill="#2e4a35" text-anchor="middle">
+    Free forever · No bank login · Made in India
+  </text>
+</svg>
