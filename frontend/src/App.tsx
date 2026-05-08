@@ -19,6 +19,8 @@ import Splits from './pages/Splits'
 import Income from './pages/Income'
 import Import from './pages/Import'
 import VerifyEmail from './pages/VerifyEmail'
+import Budgets from './pages/Budgets'
+import Referral from './pages/Referral'
 import './styles/layout.css'
 
 function AppLayout({ children }: { children: ReactNode }) {
@@ -67,7 +69,6 @@ function WakeUpBanner() {
   useEffect(() => {
     if (pinged.current || !import.meta.env.VITE_API_URL) return
     pinged.current = true
-    // Only show banner if backend takes > 1.5s to respond
     const timer = setTimeout(() => setShow(true), 1500)
     pingBackend().then(() => {
       clearTimeout(timer)
@@ -101,13 +102,14 @@ export default function App() {
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/transactions" element={<PrivateRoute><Transactions /></PrivateRoute>} />
           <Route path="/income" element={<PrivateRoute><Income /></PrivateRoute>} />
-          <Route path="/budgets" element={<Navigate to="/transactions" replace />} />
+          <Route path="/budgets" element={<PrivateRoute><Budgets /></PrivateRoute>} />
           <Route path="/goals" element={<PrivateRoute><Goals /></PrivateRoute>} />
           <Route path="/household" element={<PrivateRoute><Household /></PrivateRoute>} />
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           <Route path="/calculators" element={<PrivateRoute><Calculators /></PrivateRoute>} />
           <Route path="/splits" element={<PrivateRoute><Splits /></PrivateRoute>} />
           <Route path="/import" element={<PrivateRoute><Import /></PrivateRoute>} />
+          <Route path="/referral" element={<PrivateRoute><Referral /></PrivateRoute>} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
