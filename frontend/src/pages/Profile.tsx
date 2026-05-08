@@ -21,6 +21,9 @@ export default function Profile() {
   const [stats, setStats] = useState<UserStats | null>(null)
   const [verifyMsg, setVerifyMsg] = useState('')
   const [resending, setResending] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleteErr, setDeleteErr] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     api.get<UserStats>('/profile/stats').then(setStats).catch(() => {})
@@ -66,6 +69,24 @@ export default function Profile() {
       setVerifyMsg(err instanceof Error ? err.message : 'Failed to send')
     } finally {
       setResending(false)
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (deleteConfirm !== 'DELETE') { setDeleteErr('Type DELETE to confirm'); return }
+    setDeleting(true); setDeleteErr('')
+    try {
+      const BASE = import.meta.env.VITE_API_URL ?? ''
+      const res = await fetch(`${BASE}/api/profile`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` },
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error('Delete failed — please try again')
+      window.location.href = '/'
+    } catch (err) {
+      setDeleteErr(err instanceof Error ? err.message : 'Failed to delete account')
+      setDeleting(false)
     }
   }
 
@@ -152,26 +173,87 @@ export default function Profile() {
 
       <div className="profile-section">
         <h2 className="profile-section-title">Export your data</h2>
-        <p className="profile-section-desc">Download all your transactions, budgets and goals as a JSON file.</p>
+        <p className="profile-section-desc">Download all your transactions, budgets and goals.</p>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button
+            className="btn-secondary"
+            onClick={async () => {
+              try {
+                const BASE = import.meta.env.VITE_API_URL ?? ''
+                const res = await fetch(`${BASE}/api/export/json`, {
+                  headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` },
+                  credentials: 'include',
+                })
+                if (!res.ok) return
+                const blob = await res.blob()
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url; a.download = 'fincura-export.json'; a.click()
+                URL.revokeObjectURL(url)
+              } catch { /* best-effort */ }
+            }}
+          >
+            ↓ Export all data (JSON)
+          </button>
+          <button
+            className="btn-secondary"
+            onClick={async () => {
+              try {
+                const BASE = import.meta.env.VITE_API_URL ?? ''
+                const res = await fetch(`${BASE}/api/export/csv`, {
+                  headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` },
+                  credentials: 'include',
+                })
+                if (!res.ok) return
+                const blob = await res.blob()
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url; a.download = 'fincura-transactions.csv'; a.click()
+                URL.revokeObjectURL(url)
+              } catch { /* best-effort */ }
+            }}
+          >
+            ↓ Export transactions (CSV)
+          </button>
+        </div>
+      </div>
+
+      <div
+        className="profile-section"
+        style={{
+          border: '1px solid #dc2626',
+          borderRadius: '8px',
+          padding: '1.25rem',
+        }}
+      >
+        <h2 className="profile-section-title" style={{ color: '#dc2626' }}>Danger zone</h2>
+        <p className="profile-section-desc">
+          Permanently delete your account and all your data (transactions, budgets, goals, splits).
+          This cannot be undone.
+        </p>
+        <label className="form-label" style={{ marginTop: '0.75rem' }}>
+          Type <strong>DELETE</strong> to confirm
+          <input
+            type="text"
+            value={deleteConfirm}
+            onChange={e => { setDeleteConfirm(e.target.value); setDeleteErr('') }}
+            className="form-input"
+            placeholder="DELETE"
+            style={{ marginTop: '0.4rem' }}
+          />
+        </label>
+        {deleteErr && <p className="form-error">{deleteErr}</p>}
         <button
-          className="btn-secondary"
-          onClick={async () => {
-            try {
-              const BASE = import.meta.env.VITE_API_URL ?? ''
-              const res = await fetch(`${BASE}/api/export/json`, {
-                headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` },
-                credentials: 'include',
-              })
-              if (!res.ok) return
-              const blob = await res.blob()
-              const url = URL.createObjectURL(blob)
-              const a = document.createElement('a')
-              a.href = url; a.download = 'fincura-export.json'; a.click()
-              URL.revokeObjectURL(url)
-            } catch { /* best-effort */ }
+          className="btn-primary"
+          style={{
+            background: deleteConfirm === 'DELETE' ? '#dc2626' : undefined,
+            borderColor: deleteConfirm === 'DELETE' ? '#dc2626' : undefined,
+            marginTop: '0.75rem',
           }}
+          disabled={deleting || deleteConfirm !== 'DELETE'}
+          onClick={handleDeleteAccount}
         >
-          ↓ Export all data (JSON)
+          {deleting ? 'Deleting…' : 'Delete my account'}
         </button>
       </div>
     </div>

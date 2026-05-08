@@ -17,6 +17,7 @@ async def list_transactions(
     category_id: int | None = Query(None),
     month: str | None = Query(None),
     q: str | None = Query(None),
+    tax_tag: str | None = Query(None),
     limit: int = Query(50, le=200),
     offset: int = Query(0, ge=0),
     current_user=Depends(get_current_user),
@@ -24,7 +25,7 @@ async def list_transactions(
     rows = await db.get_transactions(
         current_user["id"],
         txn_type=type, category_id=category_id, month=month, q=q,
-        limit=limit, offset=offset,
+        tax_tag=tax_tag, limit=limit, offset=offset,
     )
     return [_row(r) for r in rows]
 
@@ -37,6 +38,7 @@ async def create_transaction(body: TransactionCreate, current_user=Depends(get_c
         is_recurring=body.is_recurring,
         recurrence_rule=body.recurrence_rule,
         recurrence_end_date=body.recurrence_end_date,
+        tax_tag=body.tax_tag,
     )
     row = await db.get_transaction(current_user["id"], txn_id)
     return _row(row)
