@@ -13,6 +13,9 @@ export default function OAuthCallback() {
     const token = params.get('token')
     const error = params.get('error')
 
+    // Immediately scrub the token from the URL so it never sits in browser history
+    window.history.replaceState({}, '', window.location.pathname)
+
     if (error || !token) {
       navigate('/login?error=' + (error ?? 'oauth_failed'))
       return

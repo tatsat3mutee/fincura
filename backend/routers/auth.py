@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 
 import bcrypt
 import httpx
+import resend as _resend
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 
@@ -43,6 +44,8 @@ GOOGLE_REDIRECT_URI = os.environ.get(
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 FROM_EMAIL = os.environ.get("FROM_EMAIL", "noreply@fincura.app")
+if RESEND_API_KEY:
+    _resend.api_key = RESEND_API_KEY
 
 _GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 _GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -67,9 +70,7 @@ async def _send_verification_email(user_id: int, email: str, name: str) -> None:
     await set_verification_token(user_id, token, expires)
     verify_url = f"{FRONTEND_URL}/verify-email?token={token}"
     try:
-        import resend  # noqa: PLC0415
-        resend.api_key = RESEND_API_KEY
-        result = resend.Emails.send({
+        result = _resend.Emails.send({
             "from": FROM_EMAIL,
             "to": email,
             "subject": "Verify your Fincura account",
@@ -220,17 +221,16 @@ async def google_login():
 
 
 @router.get("/google/callback")
-async def google_callback(code: str, state: str | None = None, error: str | None = None):
+async def google_callback(code: str, state: str, error: str | None = None):
     if error:
         return RedirectResponse(f"{FRONTEND_URL}/login?error=google_cancelled")
     if not GOOGLE_CLIENT_ID:
         return RedirectResponse(f"{FRONTEND_URL}/login?error=not_configured")
 
-    if state:
-        try:
-            jwt.decode(state, SECRET_KEY, algorithms=[ALGORITHM])
-        except JWTError:
-            return RedirectResponse(f"{FRONTEND_URL}/login?error=invalid_state")
+    try:
+        jwt.decode(state, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        return RedirectResponse(f"{FRONTEND_URL}/login?error=invalid_state")
 
     try:
         async with httpx.AsyncClient() as client:
