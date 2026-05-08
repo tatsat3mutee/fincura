@@ -2,7 +2,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
-# ── Auth ──────────────────────────────────────────────────────────────────────
+# ── Auth ────────────────────────────────────────────────────────────────────────────────
 
 class UserRegister(BaseModel):
     name: str = Field(min_length=1, max_length=100)
@@ -34,7 +34,7 @@ class TokenOut(BaseModel):
     user: UserOut
 
 
-# ── Categories ────────────────────────────────────────────────────────────────
+# ── Categories ────────────────────────────────────────────────────────────────────
 
 class CategoryOut(BaseModel):
     id: int
@@ -46,7 +46,7 @@ class CategoryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# ── Transactions ──────────────────────────────────────────────────────────────
+# ── Transactions ──────────────────────────────────────────────────────────────────
 
 class TransactionCreate(BaseModel):
     type: Literal["expense", "income"]
@@ -58,6 +58,7 @@ class TransactionCreate(BaseModel):
     is_recurring: bool = False
     recurrence_rule: str | None = Field(default=None, max_length=50)
     recurrence_end_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    tax_tag: str | None = Field(default=None, max_length=20)
 
 
 class TransactionUpdate(BaseModel):
@@ -70,6 +71,7 @@ class TransactionUpdate(BaseModel):
     is_recurring: bool | None = None
     recurrence_rule: str | None = Field(default=None, max_length=50)
     recurrence_end_date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    tax_tag: str | None = Field(default=None, max_length=20)
 
 
 class TransactionOut(BaseModel):
@@ -89,11 +91,12 @@ class TransactionOut(BaseModel):
     is_recurring: bool = False
     recurrence_rule: str | None = None
     recurrence_end_date: str | None = None
+    tax_tag: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
-# ── Budgets ───────────────────────────────────────────────────────────────────
+# ── Budgets ────────────────────────────────────────────────────────────────────────
 
 class BudgetCreate(BaseModel):
     category_id: int
@@ -127,7 +130,7 @@ class BudgetOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# ── Goals ─────────────────────────────────────────────────────────────────────
+# ── Goals ─────────────────────────────────────────────────────────────────────────────
 
 class GoalCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
@@ -175,7 +178,7 @@ class GoalOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# ── Household ─────────────────────────────────────────────────────────────────
+# ── Household ───────────────────────────────────────────────────────────────────────
 
 class HouseholdCreate(BaseModel):
     name: str
@@ -207,7 +210,7 @@ class HouseholdOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# ── Profile ───────────────────────────────────────────────────────────────────
+# ── Profile ──────────────────────────────────────────────────────────────────────────────
 
 class ProfileUpdate(BaseModel):
     name: str
@@ -232,7 +235,7 @@ class UserStatsOut(BaseModel):
     total_earned: float
 
 
-# ── Splits ────────────────────────────────────────────────────────────────────
+# ── Splits ───────────────────────────────────────────────────────────────────────────────
 
 class SplitMemberCreate(BaseModel):
     name: str
@@ -260,4 +263,3 @@ class SplitOut(BaseModel):
     created_at: str
     members: list[SplitMemberOut]
     model_config = ConfigDict(from_attributes=True)
-

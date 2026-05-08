@@ -37,3 +37,8 @@ async def change_password(body: ChangePassword, current_user: dict = Depends(get
 @router.get("/stats", response_model=UserStatsOut)
 async def get_stats(current_user: dict = Depends(get_current_user)):
     return await db.get_user_stats(current_user["id"])
+
+
+@router.delete("", status_code=204)
+async def delete_account(current_user: dict = Depends(get_current_user)):
+    await db.delete_user(current_user["id"])

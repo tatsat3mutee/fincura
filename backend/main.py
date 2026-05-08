@@ -18,11 +18,12 @@ from routers import export as export_router
 from routers import import_ as import_router
 from routers import insights as insights_router
 from routers import referral as referral_router
+from routers import recurring as recurring_router
 
 _ENV = os.getenv("ENV", "development")
 _IS_PROD = _ENV == "production"
 
-# ── Structured JSON logging ──────────────────────────────────────────────────
+# ── Structured JSON logging ────────────────────────────────────────────
 class _JSONFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         log: dict = {
@@ -40,14 +41,14 @@ _handler.setFormatter(_JSONFormatter())
 logging.basicConfig(level=logging.INFO, handlers=[_handler])
 logger = logging.getLogger("fincura")
 
-# ── Sentry ───────────────────────────────────────────────────────────────────
-_SENTRY_DSN = os.getenv("SENTRY_DSN", "")
-if _SENTRY_DSN:
+# ── Sentry ────────────────────────────────────────────────────────────────────────────
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+if SENTRY_DSN:
     import sentry_sdk
     from sentry_sdk.integrations.fastapi import FastApiIntegration
     from sentry_sdk.integrations.logging import LoggingIntegration
     sentry_sdk.init(
-        dsn=_SENTRY_DSN,
+        dsn=SENTRY_DSN,
         integrations=[
             FastApiIntegration(),
             LoggingIntegration(level=logging.WARNING, event_level=logging.ERROR),
@@ -123,19 +124,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router,           prefix="/api/auth",         tags=["auth"])
-app.include_router(categories.router,     prefix="/api/categories",   tags=["categories"])
-app.include_router(transactions.router,   prefix="/api/transactions",  tags=["transactions"])
-app.include_router(charts.router,         prefix="/api/charts",        tags=["charts"])
-app.include_router(budgets.router,        prefix="/api/budgets",       tags=["budgets"])
-app.include_router(goals.router,          prefix="/api/goals",         tags=["goals"])
-app.include_router(household.router,      prefix="/api/household",     tags=["household"])
-app.include_router(profile.router,        prefix="/api/profile",       tags=["profile"])
+app.include_router(auth.router,             prefix="/api/auth",         tags=["auth"])
+app.include_router(categories.router,       prefix="/api/categories",   tags=["categories"])
+app.include_router(transactions.router,     prefix="/api/transactions",  tags=["transactions"])
+app.include_router(charts.router,           prefix="/api/charts",        tags=["charts"])
+app.include_router(budgets.router,          prefix="/api/budgets",       tags=["budgets"])
+app.include_router(goals.router,            prefix="/api/goals",         tags=["goals"])
+app.include_router(household.router,        prefix="/api/household",     tags=["household"])
+app.include_router(profile.router,          prefix="/api/profile",       tags=["profile"])
 app.include_router(splits.router)
-app.include_router(export_router.router,  prefix="/api",               tags=["export"])
-app.include_router(import_router.router,  prefix="/api",               tags=["import"])
-app.include_router(insights_router.router, prefix="/api/insights",     tags=["insights"])
+app.include_router(export_router.router,    prefix="/api",               tags=["export"])
+app.include_router(import_router.router,    prefix="/api",               tags=["import"])
+app.include_router(insights_router.router,  prefix="/api/insights",      tags=["insights"])
 app.include_router(referral_router.router)
+app.include_router(recurring_router.router, prefix="/api",               tags=["recurring"])
 
 
 @app.get("/health", include_in_schema=False)

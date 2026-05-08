@@ -10,7 +10,7 @@ DATABASE_URL: str = os.getenv("DATABASE_URL", "")
 IS_POSTGRES: bool = DATABASE_URL.startswith("postgres")
 DB_PATH = Path(__file__).parent.parent / "fincura.db"
 
-# ── PostgreSQL support (asyncpg wrapped to look like aiosqlite) ────────────────
+# ── PostgreSQL support (asyncpg wrapped to look like aiosqlite) ──────────────────
 if IS_POSTGRES:
     import asyncpg as _asyncpg
 
@@ -90,7 +90,7 @@ if IS_POSTGRES:
         if _pool:
             await _pool.close()
 
-# ── SQLite support (local / CI) ────────────────────────────────────────────────
+# ── SQLite support (local / CI) ────────────────────────────────────────────────────
 else:
     import aiosqlite
 
@@ -108,7 +108,7 @@ else:
         pass
 
 
-# ── Schema ─────────────────────────────────────────────────────────────────────
+# ── Schema ─────────────────────────────────────────────────────────────────────────────
 
 _SCHEMA_SQLITE = """
 CREATE TABLE IF NOT EXISTS users (
@@ -231,7 +231,7 @@ _SCHEMA_MIGRATIONS = [
     "ALTER TABLE savings_goals ADD COLUMN scheme_notes TEXT",
     # Insert Savings category if it doesn't already exist (idempotent)
     "INSERT INTO categories (user_id, name, icon, color, type, system_default, sort_order)"
-    " SELECT NULL, 'Savings', '💰', '#2e7d52', 'expense', 1, 11"
+    " SELECT NULL, 'Savings', '\U0001f4b0', '#2e7d52', 'expense', 1, 11"
     " WHERE NOT EXISTS (SELECT 1 FROM categories WHERE name = 'Savings' AND system_default = 1)",
     # Recurring transactions support
     "ALTER TABLE transactions ADD COLUMN is_recurring INTEGER NOT NULL DEFAULT 0",
@@ -260,24 +260,26 @@ _SCHEMA_MIGRATIONS = [
         "  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
         ")"
     ),
+    # Tax tagging for transactions
+    "ALTER TABLE transactions ADD COLUMN tax_tag TEXT",
 ]
 
 _SEED_CATEGORIES = [
-    ("Food & Drink",       "🍜", "#c17f24", "expense", 1),
-    ("Transport",          "🚌", "#5b7fa6", "expense", 2),
-    ("Housing & Bills",    "🏠", "#1a472a", "expense", 3),
-    ("Health",             "💊", "#8b5e83", "expense", 4),
-    ("Shopping",           "🛍️",  "#d4875e", "expense", 5),
-    ("Entertainment",      "🎬", "#6b8e5e", "expense", 6),
-    ("Education",          "📚", "#4a7fa5", "expense", 7),
+    ("Food & Drink",       "\U0001f35c", "#c17f24", "expense", 1),
+    ("Transport",          "\U0001f68c", "#5b7fa6", "expense", 2),
+    ("Housing & Bills",    "\U0001f3e0", "#1a472a", "expense", 3),
+    ("Health",             "\U0001f48a", "#8b5e83", "expense", 4),
+    ("Shopping",           "\U0001f6cd️",  "#d4875e", "expense", 5),
+    ("Entertainment",      "\U0001f3ac", "#6b8e5e", "expense", 6),
+    ("Education",          "\U0001f4da", "#4a7fa5", "expense", 7),
     ("Travel",             "✈️",  "#7a9e7e", "expense", 8),
-    ("Personal Care",      "🪥", "#b88db0", "expense", 9),
-    ("Gifts & Donations",  "🎁", "#c0724a", "expense", 10),
-    ("Savings",            "💰", "#2e7d52", "expense", 11),
-    ("Salary",             "💼", "#2e7d52", "income",  12),
-    ("Freelance",          "💻", "#357abd", "income",  13),
-    ("Business",           "📈", "#1a472a", "income",  14),
-    ("Investment Returns", "📊", "#4a8c6a", "income",  15),
+    ("Personal Care",      "\U0001fab5", "#b88db0", "expense", 9),
+    ("Gifts & Donations",  "\U0001f381", "#c0724a", "expense", 10),
+    ("Savings",            "\U0001f4b0", "#2e7d52", "expense", 11),
+    ("Salary",             "\U0001f4bc", "#2e7d52", "income",  12),
+    ("Freelance",          "\U0001f4bb", "#357abd", "income",  13),
+    ("Business",           "\U0001f4c8", "#1a472a", "income",  14),
+    ("Investment Returns", "\U0001f4ca", "#4a8c6a", "income",  15),
     ("Other",              "◎",  "#6b6b6b", "both",    16),
 ]
 
@@ -329,7 +331,7 @@ async def seed_db() -> None:
         await db.commit()
 
 
-# ── User queries ─────────────────────────────────────────────────────────────
+# ── User queries ───────────────────────────────────────────────────────────────────
 
 async def create_user(name: str, email: str, password_hash: str) -> int:
     async with get_db() as db:
@@ -351,6 +353,12 @@ async def get_user_by_id(user_id: int):
     async with get_db() as db:
         cur = await db.execute("SELECT * FROM users WHERE id = ?", (user_id,))
         return await cur.fetchone()
+
+
+async def delete_user(user_id: int) -> None:
+    async with get_db() as db:
+        await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        await db.commit()
 
 
 async def set_verification_token(user_id: int, token: str, expires: str) -> None:
@@ -402,7 +410,7 @@ async def link_google_account(user_id: int, google_id: str) -> None:
         await db.commit()
 
 
-# ── Category queries ──────────────────────────────────────────────────────────
+# ── Category queries ────────────────────────────────────────────────────────────────
 
 async def get_categories(user_id: int):
     async with get_db() as db:
@@ -413,22 +421,23 @@ async def get_categories(user_id: int):
         return await cur.fetchall()
 
 
-# ── Transaction queries ───────────────────────────────────────────────────────
+# ── Transaction queries ───────────────────────────────────────────────────────────────
 
 async def create_transaction(
     user_id: int, txn_type: str, amount: float, category_id: int,
     note: str | None, txn_date: str, visibility: str = "personal",
     is_recurring: bool = False, recurrence_rule: str | None = None,
     recurrence_end_date: str | None = None,
+    tax_tag: str | None = None,
 ) -> int:
     async with get_db() as db:
         cur = await db.execute(
             "INSERT INTO transactions"
             " (user_id, type, amount, category_id, note, txn_date, visibility,"
-            "  is_recurring, recurrence_rule, recurrence_end_date)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "  is_recurring, recurrence_rule, recurrence_end_date, tax_tag)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (user_id, txn_type, amount, category_id, note, txn_date, visibility,
-             int(is_recurring), recurrence_rule, recurrence_end_date),
+             int(is_recurring), recurrence_rule, recurrence_end_date, tax_tag),
         )
         await db.commit()
         return cur.lastrowid
@@ -451,6 +460,7 @@ async def get_transactions(
     category_id: int | None = None,
     month: str | None = None,
     q: str | None = None,
+    tax_tag: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ):
@@ -472,6 +482,9 @@ async def get_transactions(
     if q:
         sql += " AND t.note LIKE ?"
         params.append("%" + q + "%")
+    if tax_tag:
+        sql += " AND t.tax_tag = ?"
+        params.append(tax_tag)
     sql += " ORDER BY t.txn_date DESC, t.id DESC LIMIT ? OFFSET ?"
     params.extend([limit, offset])
     async with get_db() as db:
@@ -483,17 +496,19 @@ async def update_transaction(user_id: int, txn_id: int, data: dict) -> bool:
     current = await get_transaction(user_id, txn_id)
     if not current:
         return False
+    current_dict = dict(current)
     async with get_db() as db:
         await db.execute(
             "UPDATE transactions SET type=?, amount=?, category_id=?, note=?, txn_date=?,"
-            " visibility=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?",
+            " visibility=?, tax_tag=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?",
             (
-                data.get("type", current["type"]),
-                data.get("amount", current["amount"]),
-                data.get("category_id", current["category_id"]),
-                data.get("note", current["note"]),
-                data.get("txn_date", current["txn_date"]),
-                data.get("visibility", current["visibility"]),
+                data.get("type", current_dict.get("type")),
+                data.get("amount", current_dict.get("amount")),
+                data.get("category_id", current_dict.get("category_id")),
+                data.get("note", current_dict.get("note")),
+                data.get("txn_date", current_dict.get("txn_date")),
+                data.get("visibility", current_dict.get("visibility")),
+                data.get("tax_tag", current_dict.get("tax_tag")),
                 txn_id, user_id,
             ),
         )
@@ -522,7 +537,7 @@ async def get_recent_transactions(user_id: int, limit: int = 5):
         return await cur.fetchall()
 
 
-# ── Chart / summary queries ───────────────────────────────────────────────────
+# ── Chart / summary queries ───────────────────────────────────────────────────────────────
 
 async def get_monthly_summary(user_id: int, month: str) -> dict:
     async with get_db() as db:
@@ -576,7 +591,7 @@ async def get_daily_spend(user_id: int, month: str):
         return await cur.fetchall()
 
 
-# ── Budget queries ────────────────────────────────────────────────────────────
+# ── Budget queries ────────────────────────────────────────────────────────────────────
 
 async def get_budgets(user_id: int, month: str):
     async with get_db() as db:
@@ -647,7 +662,7 @@ async def delete_budget(user_id: int, budget_id: int) -> bool:
         return cur.rowcount > 0
 
 
-# ── Savings goal queries ──────────────────────────────────────────────────────
+# ── Savings goal queries ──────────────────────────────────────────────────────────────
 
 async def get_goals(user_id: int):
     async with get_db() as db:
@@ -750,7 +765,7 @@ async def deposit_to_goal(user_id: int, goal_id: int, amount: float) -> bool:
     return True
 
 
-# ── Household queries ─────────────────────────────────────────────────────────
+# ── Household queries ───────────────────────────────────────────────────────────────────
 
 def _gen_invite_code() -> str:
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
@@ -840,7 +855,7 @@ async def leave_household(user_id: int, household_id: int) -> bool:
         return True
 
 
-# ── Profile queries ───────────────────────────────────────────────────────────
+# ── Profile queries ─────────────────────────────────────────────────────────────────────
 
 async def update_user_profile(user_id: int, name: str, currency: str) -> bool:
     async with get_db() as db:
@@ -873,7 +888,7 @@ async def get_user_stats(user_id: int) -> dict:
         return dict(row) if row else {"total_txns": 0, "total_spent": 0.0, "total_earned": 0.0}
 
 
-# ── Splits (bill splitting) ────────────────────────────────────────────────
+# ── Splits (bill splitting) ──────────────────────────────────────────────────────────────
 
 async def get_splits(user_id: int) -> list:
     async with get_db() as db:
