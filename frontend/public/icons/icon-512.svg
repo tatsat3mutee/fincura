@@ -5,19 +5,14 @@
       <stop offset="100%" style="stop-color:#0f2818;stop-opacity:1" />
     </linearGradient>
   </defs>
-  <!-- Background -->
+  <!-- Safe area background -->
   <rect width="512" height="512" rx="128" fill="url(#grad)"/>
-  <!-- Circle -->
-  <circle cx="256" cy="256" r="192" fill="white" opacity="0.95"/>
-  <!-- Bars representing finance growth -->
-  <g fill="#2e7d52">
-    <rect x="128" y="288" width="44" height="88" rx="6"/>
-    <rect x="204" y="224" width="44" height="152" rx="6"/>
-    <rect x="280" y="160" width="44" height="216" rx="6"/>
-    <rect x="356" y="96" width="44" height="280" rx="6"/>
-  </g>
-  <!-- Growth indicator dot -->
-  <circle cx="428" cy="80" r="32" fill="#2e7d52" opacity="0.8"/>
-  <!-- Sparkle effect -->
-  <path d="M 428 50 L 432 68 L 450 72 L 436 82 L 440 100 L 428 88 L 416 100 L 420 82 L 406 72 L 424 68 Z" fill="#1a472a" opacity="0.6"/>
+  <!-- Shield -->
+  <path d="M256 64 L416 132 Q432 140 432 156 L432 256 Q432 372 256 460 Q80 372 80 256 L80 156 Q80 140 96 132 Z" fill="#2e7d52"/>
+  <!-- Inner shield -->
+  <path d="M256 96 L396 154 Q408 160 408 172 L408 256 Q408 356 256 432 Q104 356 104 256 L104 172 Q104 160 116 154 Z" fill="#3d9c6a"/>
+  <!-- ₹ symbol -->
+  <text x="256" y="310" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-weight="700" font-size="210" fill="white">₹</text>
+  <!-- Growth arrow -->
+  <path d="M336 140 L380 100 L380 140" stroke="white" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.85"/>
 </svg>

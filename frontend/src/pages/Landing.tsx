@@ -1,19 +1,7 @@
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import FincuraLogo from '../components/FincuraLogo'
 import '../styles/landing.css'
-
-function FincuraLogo({ size = 24 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-      <rect width="40" height="40" rx="9" fill="#1a472a"/>
-      <circle cx="20" cy="21" r="13" fill="white"/>
-      <rect x="12" y="23" width="4.5" height="7" rx="1" fill="#2e7d52"/>
-      <rect x="18.5" y="18" width="4.5" height="12" rx="1" fill="#2e7d52"/>
-      <rect x="25" y="12" width="4.5" height="18" rx="1" fill="#1a472a"/>
-      <polygon points="27.25,9 30.5,14.5 24,14.5" fill="#1a472a"/>
-    </svg>
-  )
-}
 
 const FEATURES = [
   {

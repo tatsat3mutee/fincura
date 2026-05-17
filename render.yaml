@@ -17,7 +17,7 @@ services:
       - key: ENV
         value: production
       - key: ALLOWED_ORIGINS
-        value: https://fincura.vercel.app
+        value: https://fincura.onrender.com,https://fincura.tatsatpandey.com
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
@@ -25,7 +25,7 @@ services:
       - key: GOOGLE_REDIRECT_URI
         value: https://fincura-api.onrender.com/api/auth/google/callback
       - key: FRONTEND_URL
-        value: https://fincura.vercel.app
+        value: https://fincura.onrender.com
       - key: SENTRY_DSN
         sync: false
       - key: RESEND_API_KEY

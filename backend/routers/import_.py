@@ -2,7 +2,7 @@
 Bank statement import endpoints.
 
 Flow:
-  POST /import/preview  — upload CSV/XLSX, returns parsed rows (dry-run, nothing saved)
+  POST /import/preview  — upload CSV/XLSX/XLS/PDF, returns parsed rows (dry-run, nothing saved)
   POST /import/confirm  — save the approved rows as transactions
 
 Both steps require authentication. The confirm step accepts the same preview list
@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from auth.jwt import get_current_user
 from database.db import get_db
-from services.bank_parser import parse_bank_csv
+from services.bank_parser import parse_bank_statement
 
 router = APIRouter(prefix="/import", tags=["import"])
 
@@ -41,12 +41,14 @@ class ConfirmRequest(BaseModel):
 
 @router.post("/preview", response_model=list[PreviewRow])
 async def import_preview(
-    file: Annotated[UploadFile, File(description="CSV or XLSX bank statement")],
+    file: Annotated[UploadFile, File(description="CSV, XLSX, XLS, or PDF bank statement")],
+    password: Annotated[str | None, Form(description="Password for encrypted files")] = None,
     current_user: dict = Depends(get_current_user),
 ):
     """
     Parse the uploaded bank statement and return rows for the user to review.
     Nothing is written to the database.
+    Returns 422 with detail "password_required" or "wrong_password" for encrypted files.
     """
     raw = await file.read(_MAX_FILE_SIZE + 1)
     if len(raw) > _MAX_FILE_SIZE:
@@ -54,11 +56,12 @@ async def import_preview(
 
     filename = file.filename or ""
     try:
-        rows = parse_bank_csv(raw, filename)
+        rows = parse_bank_statement(raw, filename, password)
+    except PermissionError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
-    # Cap at 1000 rows to prevent memory issues
     return rows[:1000]
 
 

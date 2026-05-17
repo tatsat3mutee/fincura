@@ -1,6 +1,7 @@
 """
-Bank statement CSV parser.
-Supports HDFC, ICICI, SBI, Axis, and a Generic fallback.
+Bank statement parser.
+Supports CSV, XLSX, XLS, and PDF formats.
+Banks: HDFC, ICICI, SBI, Axis, Kotak, BOB, PNB, and a Generic fallback.
 All parsers return a list of dicts with keys:
     txn_date (YYYY-MM-DD), type (income|expense), amount (float), note (str)
 """
@@ -155,21 +156,45 @@ def _detect_bank(cols: list[str]) -> str:
     return "generic"
 
 
-def parse_bank_csv(content: bytes, filename: str = "") -> list[dict]:
+def _read_excel_or_csv(content: bytes, filename: str, password: str | None = None) -> pd.DataFrame:
+    """Read CSV/XLSX/XLS into a DataFrame, handling passwords and encoding."""
+    fname = filename.lower()
+    if fname.endswith(".xlsx"):
+        buf = io.BytesIO(content)
+        if password:
+            import msoffcrypto
+            decrypted = io.BytesIO()
+            f = msoffcrypto.OfficeFile(buf)
+            if f.is_encrypted():
+                f.load_key(password=password)
+                f.decrypt(decrypted)
+                decrypted.seek(0)
+                buf = decrypted
+            else:
+                buf.seek(0)
+        return pd.read_excel(buf, engine="openpyxl")
+    elif fname.endswith(".xls"):
+        return pd.read_excel(io.BytesIO(content), engine="xlrd")
+    else:
+        # CSV — try utf-8, fall back to latin-1
+        try:
+            return pd.read_csv(io.BytesIO(content), encoding="utf-8", skip_blank_lines=True, on_bad_lines="skip")
+        except UnicodeDecodeError:
+            return pd.read_csv(io.BytesIO(content), encoding="latin-1", skip_blank_lines=True, on_bad_lines="skip")
+
+
+def parse_bank_csv(content: bytes, filename: str = "", password: str | None = None) -> list[dict]:
     """
-    Parse a bank statement CSV/XLSX and return normalised transaction rows.
+    Parse a bank statement CSV/XLSX/XLS and return normalised transaction rows.
     Raises ValueError on unreadable files.
+    Raises PermissionError if file is password-protected and no/wrong password given.
     """
     try:
-        if filename.lower().endswith((".xlsx", ".xls")):
-            df = pd.read_excel(io.BytesIO(content), engine="openpyxl")
-        else:
-            # Try utf-8, fall back to latin-1
-            try:
-                df = pd.read_csv(io.BytesIO(content), encoding="utf-8", skip_blank_lines=True, on_bad_lines="skip")
-            except UnicodeDecodeError:
-                df = pd.read_csv(io.BytesIO(content), encoding="latin-1", skip_blank_lines=True, on_bad_lines="skip")
+        df = _read_excel_or_csv(content, filename, password)
     except Exception as e:
+        err_str = str(e).lower()
+        if "password" in err_str or "encrypted" in err_str or "decrypt" in err_str:
+            raise PermissionError("password_required") from e
         raise ValueError(f"Could not read file: {e}") from e
 
     # Drop fully empty rows
@@ -185,3 +210,194 @@ def parse_bank_csv(content: bytes, filename: str = "") -> list[dict]:
     if bank == "axis":
         return _parse_axis(df)
     return _parse_generic(df)
+
+
+# ── PDF Parsing ───────────────────────────────────────────────────────────────
+
+def _detect_bank_pdf(text: str) -> str:
+    """Detect which bank issued the PDF statement from its text content."""
+    t = text.lower()
+    if "state bank of india" in t or "sbi" in t:
+        return "sbi"
+    if "hdfc bank" in t:
+        return "hdfc"
+    if "icici bank" in t:
+        return "icici"
+    if "axis bank" in t:
+        return "axis"
+    if "kotak mahindra" in t:
+        return "kotak"
+    if "bank of baroda" in t or "bob" in t:
+        return "bob"
+    if "punjab national bank" in t or "pnb" in t:
+        return "pnb"
+    return "generic"
+
+
+def _clean_amount(s: str) -> float | None:
+    """Parse Indian-formatted amounts: 1,30,307.42 → 130307.42"""
+    if not s or s.strip() in ("-", "", "—", "nil"):
+        return None
+    cleaned = re.sub(r"[^\d.]", "", s.strip())
+    if not cleaned:
+        return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def _parse_sbi_pdf_tables(tables: list, text: str) -> list[dict]:
+    """Parse SBI statement tables extracted by pdfplumber."""
+    rows: list[dict] = []
+    for table in tables:
+        if not table or len(table) < 2:
+            continue
+        # Find header row to determine column indices
+        header_idx = -1
+        for i, row in enumerate(table):
+            row_text = " ".join(str(c or "").lower() for c in row)
+            if "debit" in row_text and "credit" in row_text:
+                header_idx = i
+                break
+        if header_idx < 0:
+            continue
+
+        header = [str(c or "").lower().strip() for c in table[header_idx]]
+        # SBI columns: Value Date | Post Date | Details | Ref No/Cheque No | ₹ Debit | ₹ Credit | Balance
+        date_idx = next((i for i, h in enumerate(header) if "value" in h or "date" in h), 0)
+        detail_idx = next((i for i, h in enumerate(header) if "detail" in h or "particular" in h), 2)
+        debit_idx = next((i for i, h in enumerate(header) if "debit" in h), None)
+        credit_idx = next((i for i, h in enumerate(header) if "credit" in h), None)
+
+        if debit_idx is None or credit_idx is None:
+            continue
+
+        for row in table[header_idx + 1:]:
+            if not row or len(row) <= max(debit_idx, credit_idx):
+                continue
+            date_str = str(row[date_idx] or "").strip()
+            d = _parse_date(date_str)
+            if not d:
+                continue
+            detail = str(row[detail_idx] or "").strip()[:500]
+            debit = _clean_amount(str(row[debit_idx] or ""))
+            credit = _clean_amount(str(row[credit_idx] or ""))
+            if credit and credit > 0:
+                rows.append({"txn_date": d, "type": "income", "amount": credit, "note": detail})
+            if debit and debit > 0:
+                rows.append({"txn_date": d, "type": "expense", "amount": debit, "note": detail})
+    return rows
+
+
+def _parse_generic_pdf_tables(tables: list, text: str) -> list[dict]:
+    """
+    Fallback PDF parser: look for tables with date, debit/credit or amount columns.
+    Works for HDFC, ICICI, Axis, Kotak, BOB, PNB and other banks.
+    """
+    rows: list[dict] = []
+    for table in tables:
+        if not table or len(table) < 2:
+            continue
+        # Find header row
+        header_idx = -1
+        for i, row in enumerate(table):
+            row_text = " ".join(str(c or "").lower() for c in row)
+            if ("date" in row_text) and ("debit" in row_text or "amount" in row_text or "withdrawal" in row_text):
+                header_idx = i
+                break
+        if header_idx < 0:
+            continue
+
+        header = [str(c or "").lower().strip() for c in table[header_idx]]
+        date_idx = next((i for i, h in enumerate(header) if "date" in h), 0)
+        note_idx = next((i for i, h in enumerate(header)
+                         if any(k in h for k in ("narration", "particular", "detail", "description", "remark"))), None)
+        debit_idx = next((i for i, h in enumerate(header) if any(k in h for k in ("debit", "withdrawal", "dr"))), None)
+        credit_idx = next((i for i, h in enumerate(header) if any(k in h for k in ("credit", "deposit", "cr"))), None)
+        amt_idx = next((i for i, h in enumerate(header) if "amount" in h and "debit" not in h and "credit" not in h), None)
+
+        for row in table[header_idx + 1:]:
+            if not row or len(row) <= date_idx:
+                continue
+            date_str = str(row[date_idx] or "").strip()
+            d = _parse_date(date_str)
+            if not d:
+                continue
+            note = str(row[note_idx] or "").strip()[:500] if note_idx is not None and len(row) > note_idx else ""
+
+            if amt_idx is not None and len(row) > amt_idx:
+                amount = _clean_amount(str(row[amt_idx] or ""))
+                if amount and amount != 0:
+                    txn_type = "expense" if amount < 0 else "income"
+                    rows.append({"txn_date": d, "type": txn_type, "amount": abs(amount), "note": note})
+            else:
+                debit = _clean_amount(str(row[debit_idx] or "")) if debit_idx is not None and len(row) > debit_idx else None
+                credit = _clean_amount(str(row[credit_idx] or "")) if credit_idx is not None and len(row) > credit_idx else None
+                if credit and credit > 0:
+                    rows.append({"txn_date": d, "type": "income", "amount": credit, "note": note})
+                if debit and debit > 0:
+                    rows.append({"txn_date": d, "type": "expense", "amount": debit, "note": note})
+    return rows
+
+
+def parse_bank_pdf(content: bytes, filename: str = "", password: str | None = None) -> list[dict]:
+    """
+    Parse a bank statement PDF and return normalised transaction rows.
+    Raises ValueError on unreadable files.
+    Raises PermissionError if file is password-protected and no/wrong password given.
+    """
+    import pdfplumber
+
+    try:
+        pdf = pdfplumber.open(io.BytesIO(content), password=password)
+    except Exception as e:
+        err_str = str(e).lower()
+        if "password" in err_str or "encrypted" in err_str:
+            if password:
+                raise PermissionError("wrong_password") from e
+            raise PermissionError("password_required") from e
+        raise ValueError(f"Could not read PDF: {e}") from e
+
+    # Extract text from first page for bank detection
+    first_page_text = ""
+    all_tables: list = []
+    try:
+        for page in pdf.pages:
+            if not first_page_text:
+                first_page_text = page.extract_text() or ""
+            tables = page.extract_tables()
+            if tables:
+                all_tables.extend(tables)
+    finally:
+        pdf.close()
+
+    if not all_tables:
+        raise ValueError("No transaction tables found in this PDF. The file may be an image-based scan.")
+
+    bank = _detect_bank_pdf(first_page_text)
+
+    if bank == "sbi":
+        rows = _parse_sbi_pdf_tables(all_tables, first_page_text)
+    else:
+        rows = _parse_generic_pdf_tables(all_tables, first_page_text)
+
+    if not rows:
+        # Retry with generic parser in case bank-specific one failed
+        rows = _parse_generic_pdf_tables(all_tables, first_page_text)
+
+    return rows
+
+
+# ── Unified entry point ──────────────────────────────────────────────────────
+
+def parse_bank_statement(content: bytes, filename: str = "", password: str | None = None) -> list[dict]:
+    """
+    Parse any supported bank statement format (CSV, XLSX, XLS, PDF).
+    Returns normalised transaction rows.
+    Raises ValueError for unreadable files, PermissionError for encrypted files.
+    """
+    fname = filename.lower()
+    if fname.endswith(".pdf"):
+        return parse_bank_pdf(content, filename, password)
+    return parse_bank_csv(content, filename, password)

@@ -12,6 +12,8 @@ interface PreviewRow {
   note: string
 }
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
+
 export default function Import() {
   const addToast = useAppStore((s) => s.addToast)
   const [step, setStep] = useState<'upload' | 'preview' | 'done'>('upload')
@@ -20,30 +22,64 @@ export default function Import() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [needsPassword, setNeedsPassword] = useState(false)
+  const [password, setPassword] = useState('')
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     api.get<Category[]>('/categories').then(setCategories).catch(() => {})
   }, [])
 
-  async function handleUpload(e: FormEvent) {
-    e.preventDefault()
-    const file = fileRef.current?.files?.[0]
-    if (!file) { setError('Please select a file.'); return }
+  async function uploadFile(file: File, pwd?: string) {
     setError('')
     setLoading(true)
     try {
       const form = new FormData()
       form.append('file', file)
+      if (pwd) form.append('password', pwd)
       const rows = await api.postForm<PreviewRow[]>('/import/preview', form)
       if (!rows.length) { setError('No transactions found in this file.'); return }
       setPreview(rows)
       setStep('preview')
+      setNeedsPassword(false)
+      setPendingFile(null)
+      setPassword('')
+      if (rows.length >= 1000) {
+        addToast('info', 'Showing first 1,000 transactions. Your statement may have more.')
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed')
+      const msg = err instanceof Error ? err.message : 'Upload failed'
+      if (msg === 'password_required') {
+        setNeedsPassword(true)
+        setPendingFile(file)
+        setError('')
+      } else if (msg === 'wrong_password') {
+        setError('Incorrect password. Please try again.')
+      } else {
+        setError(msg)
+      }
     } finally {
       setLoading(false)
     }
+  }
+
+  async function handleUpload(e: FormEvent) {
+    e.preventDefault()
+    const file = fileRef.current?.files?.[0]
+    if (!file) { setError('Please select a file.'); return }
+    if (file.size > MAX_FILE_SIZE) {
+      setError('File too large. Maximum size is 5 MB.')
+      return
+    }
+    await uploadFile(file)
+  }
+
+  async function handlePasswordSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!pendingFile) return
+    if (!password.trim()) { setError('Please enter the password.'); return }
+    await uploadFile(pendingFile, password)
   }
 
   async function handleConfirm(e: FormEvent) {
@@ -74,19 +110,57 @@ export default function Import() {
       {step === 'upload' && (
         <div className="card" style={{ maxWidth: 520 }}>
           <p style={{ color: 'var(--color-muted)', marginBottom: '1rem', fontSize: '0.9rem' }}>
-            Upload a CSV or Excel file from your bank (HDFC, ICICI, Axis or any standard format).
+            Upload a CSV, Excel, or PDF statement from your bank (SBI, HDFC, ICICI, Axis, Kotak, BOB, PNB or any standard format).
             We'll preview the transactions before saving.
           </p>
-          <form onSubmit={handleUpload}>
-            <label className="form-label">
-              Statement file (CSV or XLSX)
-              <input type="file" accept=".csv,.xlsx,.xls" ref={fileRef} className="form-input" required />
-            </label>
-            {error && <p className="form-error">{error}</p>}
-            <button type="submit" className="btn-primary" disabled={loading} style={{ marginTop: '1rem' }}>
-              {loading ? 'Parsing…' : 'Preview'}
-            </button>
-          </form>
+
+          {!needsPassword ? (
+            <form onSubmit={handleUpload}>
+              <label className="form-label">
+                Statement file (CSV, XLSX, XLS, or PDF)
+                <input type="file" accept=".csv,.xlsx,.xls,.pdf" ref={fileRef} className="form-input" required />
+              </label>
+              <p style={{ color: 'var(--color-muted)', fontSize: '0.78rem', marginTop: '0.25rem' }}>
+                Max 5 MB. Password-protected files are supported.
+              </p>
+              {error && <p className="form-error">{error}</p>}
+              <button type="submit" className="btn-primary" disabled={loading} style={{ marginTop: '1rem' }}>
+                {loading ? 'Parsing…' : 'Preview'}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handlePasswordSubmit}>
+              <div style={{ background: 'var(--color-bg)', borderRadius: 8, padding: '1rem', marginBottom: '1rem' }}>
+                <p style={{ fontWeight: 600, marginBottom: '0.5rem' }}>🔒 This file is password-protected</p>
+                <p style={{ color: 'var(--color-muted)', fontSize: '0.85rem', marginBottom: '0.75rem' }}>
+                  Enter the password to unlock <strong>{pendingFile?.name}</strong>
+                </p>
+                <label className="form-label">
+                  Password
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className="form-input"
+                    placeholder="Enter file password"
+                    autoFocus
+                    required
+                  />
+                </label>
+              </div>
+              {error && <p className="form-error">{error}</p>}
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button type="submit" className="btn-primary" disabled={loading}>
+                  {loading ? 'Unlocking…' : 'Unlock & Preview'}
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => {
+                  setNeedsPassword(false); setPendingFile(null); setPassword(''); setError('')
+                }}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       )}
 

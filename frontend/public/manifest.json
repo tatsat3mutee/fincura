@@ -2,7 +2,7 @@
   "name": "Fincura",
   "short_name": "Fincura",
   "description": "Personal finance tracker for individuals, couples, and families. Track expenses, set budgets, reach savings goals.",
-  "start_url": "/dashboard",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f7f5f0",
